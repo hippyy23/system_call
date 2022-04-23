@@ -20,6 +20,9 @@
 #include "err_exit.h"
 
 
+char *fifo1 = "/tmp/fifo1";
+char *fifo2 = "/tmp/fifo2";
+
 void block_all_signals() {
     // set of signals
     sigset_t signalSet;
@@ -30,13 +33,12 @@ void block_all_signals() {
     printf("<Client_0> All signals blocked!\n");
 }
 
-void quit() {
+void terminate_client0() {
     printf("<Client_0> Quitting...\n");
-    free_mem_files();
     _exit(0);
 }
 
-void start() {
+void start_client0() {
     printf("<Client_0> Starting...\n");
     block_all_signals();
 
@@ -59,7 +61,7 @@ char * get_username() {
     }
 }
 
-int search(int pos) {
+void search(char files[MAX_FILES][NAME_MAX], int pos) {
     DIR *dirp = opendir(g_wd);
     if (dirp == NULL) {
         ErrExit("open dir failed");
@@ -78,14 +80,20 @@ int search(int pos) {
 
             if (check_file_name(dentry->d_name, "send_") &&
                 check_file_size(g_wd, MAX_FILE_SIZE)) {
-                strncpy(g_files[pos], g_wd, NAME_MAX);
+                strncpy(files[pos], g_wd, NAME_MAX);
+                // TO BE REMOVED
+                printf("%s\n", files[pos]);
                 pos++;
+                
+                if (pos > MAX_FILES) {
+                    ErrExit("too many files: check MAX_FILES");
+                }
             }
             
             g_wd[lastPath] = '\0';
         } else if (dentry->d_type == DT_DIR) {
             size_t lastPath = append_path(dentry->d_name);
-            search(pos);
+            search(files, pos);
             g_wd[lastPath] = '\0';
         }
         errno = 0;
@@ -96,8 +104,6 @@ int search(int pos) {
     if (closedir(dirp) == -1) {
         ErrExit("closedir failed");
     }
-
-    return pos;
 }
 
 size_t append_path(char *dir) {
@@ -125,28 +131,16 @@ int check_file_size(char *pathname, off_t size) {
     return statbuf.st_size <= size;
 }
 
-int get_num_files() {
+int get_num_files(char files[MAX_FILES][NAME_MAX]) {
     int n = 0;
 
-    for (int i = 0; g_files[i]; i++) {
-        if (strcmp(g_files[i], "")) {
-            n++;
-        }   
+    for (int i = 0; strcmp(files[i], ""); i++) {
+        n++;
     }
 
     return n;
 }
 
-void free_mem_files() {
-    for (int i = 0; g_files[i]; i++) {    
-        free(g_files[i]);
-    }
-    free(g_files);
-}
-
-void alloc_mem_files() {
-    g_files = malloc(MAX_FILES * sizeof(char *));
-    for (int i = 0; i < MAX_FILES; i++) {
-        g_files[i] = malloc(sizeof(char) * NAME_MAX);
-    }
+void terminate_server() {
+    printf("<Server> quitting...");
 }
