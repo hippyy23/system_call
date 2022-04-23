@@ -3,3 +3,6 @@
 ///         funzioni specifiche per la gestione delle FIFO.
 
 #pragma once
+
+
+void make_fifo1(char *);
