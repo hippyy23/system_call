@@ -1,36 +1,31 @@
 CFLAGS   = -Wall -std=gnu99
-INCLUDES = -I .
-OBJDIR   = obj
+INCLUDES = -I./inc
 
-CLIENT_SRCS = defines.c err_exit.c shared_memory.c semaphore.c fifo.c client_0.c
-CLIENT_OBJS = $(addprefix $(OBJDIR)/, $(CLIENT_SRCS:.c=.o))
+CLIENT_SRCS = src/defines.c src/err_exit.c src/shared_memory.c src/semaphore.c src/fifo.c src/client_0.c src/client_functions.c
+SERVER_SRCS = src/defines.c src/err_exit.c src/shared_memory.c src/semaphore.c src/fifo.c src/server.c src/server_functions.c
 
-SERVER_SRCS = defines.c err_exit.c shared_memory.c semaphore.c fifo.c server.c
-SERVER_OBJS = $(addprefix $(OBJDIR)/, $(SERVER_SRCS:.c=.o))
+SERVER_OBJS = $(SERVER_SRCS:.c=.o)
+CLIENT_OBJS = $(CLIENT_SRCS:.c=.o)
 
-all: $(OBJDIR) client_0 server
+all: server client_0
 
 client_0: $(CLIENT_OBJS)
 	@echo "Making executable: "$@
-	@$(CC) $^ -o $@  -lm
+	@$(CC) $^ -o $@
 
 server: $(SERVER_OBJS)
 	@echo "Making executable: "$@
-	@$(CC) $^ -o $@  -lm
+	@$(CC) $^ -o $@
 
-
-$(OBJDIR):
-	@mkdir -p $(OBJDIR)
-
-$(OBJDIR)/%.o: %.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $<
+.c.o:
+	@echo "Compiling: "$<
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
 	@rm -vf ${CLIENT_OBJS}
 	@rm -vf ${SERVER_OBJS}
 	@rm -vf client_0
 	@rm -vf server
-	@rm -rf ${OBJDIR}
 	@ipcrm -a
 	@echo "Removed object files and executables..."
 
