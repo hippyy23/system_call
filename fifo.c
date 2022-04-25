@@ -13,9 +13,9 @@
 #include "fifo.h"
 
 
-void make_fifo1(char *path) {
+void make_fifo(char *path) {
     printf("%s\n", path);
     if (mkfifo(path, S_IRUSR | S_IWUSR) == -1) {
-        ErrExit("mkfifo1 failed");
+        ErrExit("mkfifo failed");
     }
 }

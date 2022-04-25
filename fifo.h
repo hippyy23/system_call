@@ -5,4 +5,4 @@
 #pragma once
 
 
-void make_fifo1(char *);
+void make_fifo(char *);

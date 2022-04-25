@@ -1,5 +1,6 @@
 /// @file client.c
 /// @brief Contiene l'implementazione del client.
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,9 +9,14 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
+
 #include <sys/types.h>
+#include <sys/sem.h>
 
 #include "defines.h"
+#include "client_functions.h"
+#include "shared_memory.h"
+#include "semaphore.h"
 #include "err_exit.h"
 
 
@@ -43,18 +49,18 @@ int main(int argc, char * argv[]) {
         ErrExit("change signal handler failed");
 
     // wait for a signal to be recieved
-    printf("Waiting for a signal...\n");
+    printf("waiting for a signal...\n");
     pause();
 
     // search for all files whose name starts with "send_"
     search(files, 0);
     // get the number of files found
     int numFiles = get_num_files(files);
-    printf("<Client_0> Numero di file trovati %d\n", numFiles);
+    printf("<Client_0> number of files found %d\n", numFiles);
 
     // send the number of files to the server through fifo1
-    printf("<Client_0> opening fifo1 %s\n", fifo1);
-    int fifo1FD = open(fifo1, O_WRONLY);
+    printf("<Client_0> opening fifo1 %s\n", g_fifo1);
+    int fifo1FD = open(g_fifo1, O_WRONLY);
     if (fifo1FD == -1) {
         ErrExit("open failed");
     }
@@ -65,6 +71,27 @@ int main(int argc, char * argv[]) {
 
     if (close(fifo1FD) != 0) {
         ErrExit("close failed");
+    }
+
+    printf("<Client_0> getting server's shared memory segment\n");
+    // get the server's shared memory segment
+    int shmid = alloc_shared_memory(g_shmKey, SHDMEM_SIZE);
+    // attach the shared memory segment
+    char *shmPtr = (char *) attach_shared_memory(shmid, 0);
+
+    // get the semaphore set
+    printf("<Client_0> getting server's semaphore set\n");
+    int semid = semget(g_semKey, 1, 0);
+    if (semid > 0) {
+        // wait for response from server on shared memory segment
+        semOp(semid, 0, -1);
+        if (*shmPtr == '*') {
+            printf("<Client_0> recieved '*' from server\n");
+        } else {
+            ErrExit("Oops... something went wrong");
+        }
+    } else {
+        ErrExit("semget failed");
     }
 
     return 0;
