@@ -2,6 +2,8 @@
 /// @brief Contiene l'implementazione delle funzioni
 ///         specifiche del progetto.
 
+#include <fcntl.h>
+
 #include "defines.h"
 #include "err_exit.h"
 

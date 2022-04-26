@@ -59,7 +59,7 @@ char * get_username() {
     }
 }
 
-void search(char files[MAX_FILES][NAME_MAX], int pos) {
+void search(int pos) {
     DIR *dirp = opendir(g_wd);
     if (dirp == NULL) {
         ErrExit("open dir failed");
@@ -78,9 +78,9 @@ void search(char files[MAX_FILES][NAME_MAX], int pos) {
 
             if (check_file_name(dentry->d_name, "send_") &&
                 check_file_size(g_wd, MAX_FILE_SIZE)) {
-                strncpy(files[pos], g_wd, NAME_MAX);
+                strncpy(g_files[pos], g_wd, NAME_MAX);
                 // TO BE REMOVED
-                printf("%s\n", files[pos]);
+                printf("%s\n", g_files[pos]);
                 pos++;
                 
                 if (pos > MAX_FILES) {
@@ -91,7 +91,7 @@ void search(char files[MAX_FILES][NAME_MAX], int pos) {
             g_wd[lastPath] = '\0';
         } else if (dentry->d_type == DT_DIR) {
             size_t lastPath = append_path(dentry->d_name);
-            search(files, pos);
+            search(pos);
             g_wd[lastPath] = '\0';
         }
         errno = 0;
@@ -129,12 +129,29 @@ int check_file_size(char *pathname, off_t size) {
     return statbuf.st_size <= size;
 }
 
-int get_num_files(char files[MAX_FILES][NAME_MAX]) {
+int get_num_files() {
     int n = 0;
 
-    for (int i = 0; strcmp(files[i], ""); i++) {
+    for (int i = 0; strcmp(g_files[i], ""); i++) {
         n++;
     }
 
     return n;
+}
+
+int check_num_chars_in_file(int fd) {
+    int count = 0;
+    ssize_t bR;
+    char buffer;
+
+    do {
+        bR = read(fd, &buffer, sizeof(char));
+        if (bR == -1) {
+            ErrExit("read failed\n");
+        } else if (bR > 0) {
+            count++;
+        }
+    } while (bR > 0);
+
+    return count - 1;
 }

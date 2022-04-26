@@ -13,3 +13,4 @@ union semun {
 
 int create_sem(key_t);
 void semOp(int, unsigned short, short);
+void remove_sem(int);

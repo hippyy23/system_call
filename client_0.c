@@ -28,9 +28,6 @@ int main(int argc, char * argv[]) {
     }
     g_wd = argv[1];
 
-    // create a 2d array to contain the path of MAX_FILES files
-    char files[MAX_FILES][NAME_MAX];
-
     // create a mask to block all signals but SIGINT and SIGUSR1
     // set of signals
     sigset_t signalSet;
@@ -53,9 +50,9 @@ int main(int argc, char * argv[]) {
     pause();
 
     // search for all files whose name starts with "send_"
-    search(files, 0);
+    search(0);
     // get the number of files found
-    int numFiles = get_num_files(files);
+    int numFiles = get_num_files(g_files);
     printf("<Client_0> number of files found %d\n", numFiles);
 
     // send the number of files to the server through fifo1
@@ -84,9 +81,53 @@ int main(int argc, char * argv[]) {
     int semid = semget(g_semKey, 1, 0);
     if (semid > 0) {
         // wait for response from server on shared memory segment
-        semOp(semid, 0, -1);
+        semOp(semid, START_END, -1);
         if (*shmPtr == '*') {
             printf("<Client_0> recieved '*' from server\n");
+            /*
+            for (int child = 0; child < numFiles; child++) {
+                pid_t pid = fork();
+
+                if (pid == -1) {
+                    ErrExit("fork failed");
+                // check whether the running process is the parent or the child
+                } else if (pid == 0) {
+                    // code executed only by the child
+
+                    // open file
+                    int fd = open(g_files[child], O_RDONLY, S_IRUSR);
+                    if (fd == -1) {
+                        ErrExit("open failed");
+                    }
+
+                    // check the number of chars
+                    int numChars = check_num_chars_in_file(fd);
+
+                    // divide the file in four equal parts
+                    // we have problems with len < 10 (5, 6, 9)
+                    // if 5 - 2 1 1 1
+                    // if 6 - 3 1 1 1
+                    // if 9 - 3 2 2 2
+                    // for the rest use ceil(numChars / 4)
+                    int size;
+                    switch (numChars) {
+                        case 5:
+                        case 6:
+                        case 9:
+                        default:
+                    }
+
+                    // block all childs until everyone has done everything mentioned above
+                    // send each part through ipcs
+                    // close file
+
+                    exit(0);
+                }
+            }
+            // code executed only by the parent
+            // wait the termination of all child processes
+            wait(wait(NULL) != -1);
+            */
         } else {
             ErrExit("Oops... something went wrong");
         }

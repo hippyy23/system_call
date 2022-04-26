@@ -1,7 +1,7 @@
 /// @file sender_manager.c
 /// @brief Contiene l'implementazione del sender_manager.
 
-//#include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -20,23 +20,24 @@
 
 char *shmPtr;
 int shmid;
+int msqid;
+int semid;
 int fifo1FD;
 int fifo2FD;
 
 void terminate_server() {
-    printf("Ctrl+c fuck off!");
+    if (msqid > 0) {
+        if (msgctl(msqid, IPC_RMID, NULL) == -1)
+            ErrExit("msgctl failed");
+        else
+            printf("<Server> message queue removed successfully\n");
+    }
+    remove_sem(semid);
     free_shared_memory(shmPtr);
     remove_shared_memory(shmid);
-    if (close(fifo1FD) != 0) {
-        // || close(fd2) != 0) {
-        ErrExit("close failed");
-    }
-
-    if (unlink(g_fifo1) != 0) {
-        // || unlink(g_fifo2) !=0) {
-        ErrExit("unlink failed");
-    }
-    _exit(0);
+    close_fifo(fifo1FD, g_fifo1);
+    //close_fifo(fifo2FD, g_fifo2);
+    exit(0);
 }
 
 int main(int argc, char * argv[]) {
@@ -47,7 +48,7 @@ int main(int argc, char * argv[]) {
     // printf("<Server> FIFO1 %s created\n", g_fifo2);
 
     // create a MESSAGE QUEUE
-    int msqid = msgget(g_msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
+    msqid = msgget(g_msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (msqid == -1) {
         ErrExit("msgget failed");
     }
@@ -60,44 +61,36 @@ int main(int argc, char * argv[]) {
 
     // create a semaphore set with 1 semapaphore
     printf("<Server> creating semaphore set\n");
-    int semid = create_sem(g_semKey);
+    semid = create_sem(g_semKey);
 
     // change signal handler for SIGINT
     if (signal(SIGINT, terminate_server) == SIG_ERR) {
         ErrExit("change signal handler failed");
     }
 
-    // open FIFO1 in read-only
-    printf("<Server> waiting for the number of files...\n");
-    fifo1FD = open(g_fifo1, O_RDONLY);
-    if (fifo1FD == -1) {
-        ErrExit("open failed");
-    }
+    while (1) {
+        // open FIFO1 in read-only
+        printf("<Server> waiting for the number of files...\n");
+        fifo1FD = open(g_fifo1, O_RDONLY);
+        if (fifo1FD == -1) {
+            ErrExit("open failed");
+        }
 
-    // read the number of files from FIFO1
-    int numFiles;
-    int bR = read(fifo1FD, &numFiles, sizeof(numFiles));
-    if (bR == -1) {
-        printf("<Server> FIFO is broken\n");
-    } else if (bR != sizeof(numFiles) || bR == 0) {
-        printf("<Server> did not recieved the number of files\n");
-    } else {
-        printf("<Server> number of files to be recieved %d\n", numFiles);
-    }
+        // read the number of files from FIFO1
+        int numFiles;
+        int bR = read(fifo1FD, &numFiles, sizeof(numFiles));
+        if (bR == -1) {
+            printf("<Server> FIFO is broken\n");
+        } else if (bR != sizeof(numFiles) || bR == 0) {
+            printf("<Server> did not recieved the number of files\n");
+        } else {
+            printf("<Server> number of files to be recieved %d\n", numFiles);
+        }
 
-    // write init signal '*' to client through shared memory
-    printf("<Server> writing '*' to client\n");
-    *shmPtr = '*';
-    semOp(semid, 0, 1);
-
-    if (close(fifo1FD) != 0) {
-        // || close(fd2) != 0) {
-        ErrExit("close failed");
-    }
-
-    if (unlink(g_fifo1) != 0) {
-        // || unlink(g_fifo2) !=0) {
-        ErrExit("unlink failed");
+        // write init signal '*' to client through shared memory
+        printf("<Server> writing '*' to client\n");
+        *shmPtr = '*';
+        semOp(semid, START_END, 1);
     }
 
     return 0;

@@ -12,8 +12,8 @@
 
 
 int create_sem(key_t semKey) {
-    // create a semaphore set with 1 semaphore
-    int semid = semget(semKey, 1, IPC_CREAT | S_IRUSR | S_IWUSR);
+    // create a semaphore set with 3 semaphore
+    int semid = semget(semKey, 3, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (semid == -1) {
         ErrExit("semget failed");
     }
@@ -28,6 +28,12 @@ int create_sem(key_t semKey) {
     }
 
     return semid;
+}
+
+void remove_sem(int semid) {
+    if (semctl(semid, 0, IPC_RMID, 0) == -1) {
+        ErrExit("semctl IPC_RMID failed");
+    }
 }
 
 void semOp(int semid, unsigned short sem_num, short sem_op) {

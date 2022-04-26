@@ -6,3 +6,4 @@
 
 
 void make_fifo(char *);
+void close_fifo(int, char *);
