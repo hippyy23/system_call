@@ -11,11 +11,11 @@ all: server client_0
 
 client_0: $(CLIENT_OBJS)
 	@echo "Making executable: "$@
-	@$(CC) $^ -o $@
+	@$(CC) $^ -o $@ -lm
 
 server: $(SERVER_OBJS)
 	@echo "Making executable: "$@
-	@$(CC) $^ -o $@
+	@$(CC) $^ -o $@ -lm
 
 .c.o:
 	@echo "Compiling: "$<
