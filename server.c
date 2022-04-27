@@ -35,6 +35,7 @@ void terminate_server() {
     remove_sem(semid);
     free_shared_memory(shmPtr);
     remove_shared_memory(shmid);
+
     close_fifo(fifo1FD, g_fifo1);
     //close_fifo(fifo2FD, g_fifo2);
     exit(0);
@@ -42,7 +43,7 @@ void terminate_server() {
 
 int main(int argc, char * argv[]) {
     // make FIFO1 and FIFO2
-    printf("<Server> creating FIFO1 %s\n", g_fifo1);
+    printf("<Server> creating FIFO1 %s...\n", g_fifo1);
     make_fifo(g_fifo1);
     // make_fifo(g_fifo2);
     // printf("<Server> FIFO1 %s created\n", g_fifo2);
@@ -53,14 +54,14 @@ int main(int argc, char * argv[]) {
         ErrExit("msgget failed");
     }
 
-    printf("<Server> creating shared memory segment\n");
+    printf("<Server> creating shared memory segment...\n");
     // allocate a SHARED MEMORY SEGMENT
-    shmid = alloc_shared_memory(g_shmKey, SHDMEM_SIZE);
+    shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
     shmPtr = (char *) attach_shared_memory(shmid, 0);
 
-    // create a semaphore set with 1 semapaphore
-    printf("<Server> creating semaphore set\n");
+    // create a semaphore set with 4 semapaphore
+    printf("<Server> creating semaphore set...\n");
     semid = create_sem(g_semKey);
 
     // change signal handler for SIGINT
@@ -71,10 +72,7 @@ int main(int argc, char * argv[]) {
     while (1) {
         // open FIFO1 in read-only
         printf("<Server> waiting for the number of files...\n");
-        fifo1FD = open(g_fifo1, O_RDONLY);
-        if (fifo1FD == -1) {
-            ErrExit("open failed");
-        }
+        fifo1FD = open_fifo(g_fifo1, O_RDONLY);
 
         // read the number of files from FIFO1
         int numFiles;
@@ -86,11 +84,32 @@ int main(int argc, char * argv[]) {
         } else {
             printf("<Server> number of files to be recieved %d\n", numFiles);
         }
+        if (close(fifo1FD) != 0) {
+            ErrExit("close failed");
+        }
+
+        // initialize the semaphore
+        initialize_sem(semid, numFiles);
 
         // write init signal '*' to client through shared memory
         printf("<Server> writing '*' to client\n");
         *shmPtr = '*';
         semOp(semid, START_END, 1);
+
+        // capire come far si che il server legga ciclicamente dalle ipcs
+        fifo1FD = open_fifo(g_fifo1, O_RDONLY);
+
+        message_struct m1;
+        bR = read(fifo1FD, &m1, sizeof(m1));
+        if (bR == -1) {
+            printf("<Server> FIFO is broken\n");
+        }
+        if (close(fifo1FD) != 0) {
+            ErrExit("close failed");
+        }
+
+        printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+
     }
 
     return 0;

@@ -47,7 +47,7 @@ void start_client0() {
     char cwdbuf[PATH_MAX];
     getcwd(cwdbuf, PATH_MAX);
 
-    printf("Ciao %s, ora inizio l'inivio dei file contenuti in %s\n", get_username(), cwdbuf);
+    printf("Ciao %s, ora inizio l'inivio dei file contenuti in %s\n", getenv("USER"), cwdbuf);
 };
 
 char * get_username() {
@@ -76,8 +76,7 @@ void search(int pos) {
         if (dentry->d_type == DT_REG) {
             size_t lastPath = append_path(dentry->d_name);
 
-            if (check_file_name(dentry->d_name, "send_") &&
-                check_file_size(g_wd, MAX_FILE_SIZE)) {
+            if (check_file_name(dentry->d_name, "sendme_") && check_file_size(g_wd, MAX_FILE_SIZE)) {
                 strncpy(g_files[pos], g_wd, NAME_MAX);
                 // TO BE REMOVED
                 printf("%s\n", g_files[pos]);
@@ -112,8 +111,17 @@ size_t append_path(char *dir) {
 }
 
 int check_file_name(char *file, char *str) {
-    return (file == NULL || str == NULL) ?
-            0 : strncmp(file, str, 5);
+    if (file == NULL || str == NULL) {
+        return 0;
+    } else {
+        for (int i = 0; i < 5; i++) {
+            if (file[i] != str[i]) {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
 }
 
 int check_file_size(char *pathname, off_t size) {
@@ -152,6 +160,8 @@ int check_num_chars_in_file(int fd) {
             count++;
         }
     } while (bR > 0);
+    lseek(fd, 0, SEEK_SET);
+
 
     return count - 1;
 }

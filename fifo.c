@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,8 +22,9 @@ void make_fifo(char *path) {
 }
 
 void close_fifo(int fifoFD, char *fifoPath) {
-    if (close(fifoFD) != 0) {
-        ErrExit("close failed");
+    errno = 0;
+    if (close(fifoFD) != 0 && errno != EBADF) {
+        ErrExit("close failed");  
     }
     if (unlink(fifoPath) != 0) {
         ErrExit("unlink failed");

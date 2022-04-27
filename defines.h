@@ -9,25 +9,25 @@
 
 #define MAX_FILES 100
 #define MAX_FILE_SIZE 4096
-#define SHDMEM_SIZE 51200
 #define MAX_PAGE_SIZE 1024
 #define MAX_MESSAGES_PER_IPC 50
 
 #define START_END 0
 #define WAIT_CHILD 1
 #define MUTEX_SHM 2
+#define MUTEX_FIFO 3
 
 
-struct message {
+typedef struct message {
     char content[MAX_PAGE_SIZE];
     int pid;
     char path[NAME_MAX];
-};
+} message_struct;
 
-struct msgqueue {
+typedef struct msgqueue {
     long mtype;
     struct message mtext;
-};
+} msgqueue_struct;
 
 // GLOBAL VARIABLES
 
@@ -37,3 +37,6 @@ int g_msgKey;
 int g_shmKey;
 int g_semKey;
 int g_shmVector[MAX_MESSAGES_PER_IPC];
+
+int open_fifo(char *, int);
+void write_fifo(int, message_struct *, int);
