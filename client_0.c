@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/sem.h>
 #include <sys/wait.h>
+#include <sys/msg.h>
 
 #include "defines.h"
 #include "client_functions.h"
@@ -66,6 +67,11 @@ int main(int argc, char * argv[]) {
     }
     if (close(fifo1FD) != 0) {
         ErrExit("close failed");
+    }
+
+    int msqid = msgget(g_msgKey, 0);
+    if (msqid == -1) {
+        ErrExit("msgget failed");
     }
 
     printf("<Client_0> getting server's shared memory segment...\n");
@@ -130,16 +136,15 @@ int main(int argc, char * argv[]) {
                     // read from file a chunk of size 'size'
                     printf("<Client_%d> reading content from file...\n", pid);
                     read_from_file(fd, part1.content, size);
-                    // get mutex on FIFO1
-                    semOp(semid, MUTEX_FIFO1, -1);
+                    // wait for server
+                    semOp(semid, SYNC_FIFO1, -1);
                     // open FIFO1
                     printf("<Client_%d> opening FIFO1...\n", pid);
                     fifo1FD = open_fifo(g_fifo1, O_WRONLY);
                     // write on FIFO1 the 1st part of the file of the size 'size'
                     printf("<Client_%d> writing on FIFO1...\n", pid);
                     write_fifo(fifo1FD, &part1, sizeof(part1));                    
-                    // realease mutex
-                    semOp(semid, MUTEX_FIFO1, 1);
+                    // semOp(semid, SYNC_SERVER, 1);
 
                     // 2. FIFO2
                     message_struct part2;
@@ -148,28 +153,36 @@ int main(int argc, char * argv[]) {
                     // read from file a chunk of size 'size'
                     read_from_file(fd, part2.content, size);
 
-                    // get mutex on FIFO2
-                    semOp(semid, MUTEX_FIFO2, -1);
+                    // wait for server
+                    semOp(semid, SYNC_FIFO2, -1);
                     // open FIFO2
                     printf("<Client_%d> opening FIFO2...\n", pid);
                     fifo2FD = open_fifo(g_fifo2, O_WRONLY);
                     // write on FIFO2 the 2st part of the file of the size 'size'
                     printf("<Client_%d> writing on FIFO2...\n", pid);
                     write_fifo(fifo2FD, &part2, sizeof(part2));                    
-                    // realease mutex
-                    semOp(semid, MUTEX_FIFO2, 1);
+                    semOp(semid, SYNC_SERVER, 1);
+                    
+                    // 3. MSGQUEUE
+                    msgqueue_struct part3;
+                    part3.mtype = 1;
+                    part3.mtext.pid = pid;
+                    strncpy(part3.mtext.path, g_files[child], NAME_MAX);
+                    // read from file a chunk of size 'size'
+                    read_from_file(fd, part3.mtext.content, size);
+                    // send the message to the server
+                    printf("<Client_%d> sending message through msgqueue...\n", pid);
+                    size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+                    if (msgsnd(msqid, &part3, mSize, 0) == -1) {
+                        ErrExit("msgsnd failed");
+                    }
 
-                    // // 3. MSGQUEUE
-                    // msgqueue_struct part3;
-                    // part3.mtype = 1
-                    // part3.mtext.pid = pid;
-                    // strncpy(part3.mtext.path, g_files[child], NAME_MAX);
-
-                    // // 4. SHDMEM
-                    // message_struct part4;
-                    // part4.pid = pid;
-                    // strncpy(part4.path, g_files[child], NAME_MAX);
-
+                    // 4. SHDMEM
+                    message_struct part4;
+                    part4.pid = pid;
+                    strncpy(part4.path, g_files[child], NAME_MAX);
+                    // read from file a chunk of size 'size'
+                    read_from_file(fd, part4.content, size);
 
                     // close file
                     printf("<Client_%d> closing the file %s...\n", pid, g_files[child]);

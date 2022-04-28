@@ -39,3 +39,12 @@ void read_from_file(int fd, char *buffer, int size) {
     }
     buffer[size] = '\0';
 }
+
+void read_message(int fd, message_struct *m, int size) {
+    if (read(fd, m, size) == -1) {
+        ErrExit("read failed");
+    }
+    if (close(fd) != 0) {
+        ErrExit("close failed");
+    }
+}
