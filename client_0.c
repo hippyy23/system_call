@@ -77,6 +77,7 @@ int main(int argc, char * argv[]) {
     // get the semaphore set
     printf("<Client_0> getting server's semaphore set...\n");
     int semid = semget(g_semKey, 4, 0);
+    int fifo2FD;
     if (semid > 0) {
         // wait for response from server on shared memory segment
         semOp(semid, START_END, -1);
@@ -99,7 +100,7 @@ int main(int argc, char * argv[]) {
 
                     // CHECK THE NUMBER OF CHARS
                     int numChars = check_num_chars_in_file(fd);
-                    printf("<Client_%d> number of chars found %d\n", pid, numChars);
+                    // printf("<Client_%d> number of chars found %d\n", pid, numChars);
 
                     // GET THE SIZE OF EACH PART
                     // we have problems with len < 10 (5, 6, 9)
@@ -108,7 +109,7 @@ int main(int argc, char * argv[]) {
                     // if 9 - 3 2 2 2
                     // for the rest use ceil(numChars / 4)
                     int size = ceil(numChars / 4);
-                    printf("<Client_%d> size %d\n", pid, size);
+                    // printf("<Client_%d> size %d\n", pid, size);
                     // switch (numChars) {
                     //     case 5:
                     //     case 6:
@@ -127,41 +128,51 @@ int main(int argc, char * argv[]) {
                     part1.pid = pid;
                     strncpy(part1.path, g_files[child], NAME_MAX);
                     // read from file a chunk of size 'size'
-                    if (read(fd, part1.content, size) == -1) {
-                        ErrExit("read failed");
-                    }
-                    // get mutex on fifo1
-                    semOp(semid, MUTEX_FIFO, -1);
-                    // open fifo1
+                    printf("<Client_%d> reading content from file...\n", pid);
+                    read_from_file(fd, part1.content, size);
+                    // get mutex on FIFO1
+                    semOp(semid, MUTEX_FIFO1, -1);
+                    // open FIFO1
+                    printf("<Client_%d> opening FIFO1...\n", pid);
                     fifo1FD = open_fifo(g_fifo1, O_WRONLY);
-                    // write on fifo1 the first part of the file of the size 'size'
-                    printf("<Client_%d> writing on fifo1...\n", pid);
-                    write_fifo(fifo1FD, &part1, sizeof(part1));
-                    printf("<Client_%d> closing fifo1...\n", pid);
-                    if (close(fifo1FD) != 0) {
-                        ErrExit("close failed");
-                    }
+                    // write on FIFO1 the 1st part of the file of the size 'size'
+                    printf("<Client_%d> writing on FIFO1...\n", pid);
+                    write_fifo(fifo1FD, &part1, sizeof(part1));                    
                     // realease mutex
-                    semOp(semid, MUTEX_FIFO, 1);
+                    semOp(semid, MUTEX_FIFO1, 1);
 
-                    // // 2. FIFO2
-                    // message_struct part2;
-                    // part2.pid = pid;
-                    // part2.path = g_files[child];
+                    // 2. FIFO2
+                    message_struct part2;
+                    part2.pid = pid;
+                    strncpy(part2.path, g_files[child], NAME_MAX);
+                    // read from file a chunk of size 'size'
+                    read_from_file(fd, part2.content, size);
+
+                    // get mutex on FIFO2
+                    semOp(semid, MUTEX_FIFO2, -1);
+                    // open FIFO2
+                    printf("<Client_%d> opening FIFO2...\n", pid);
+                    fifo2FD = open_fifo(g_fifo2, O_WRONLY);
+                    // write on FIFO2 the 2st part of the file of the size 'size'
+                    printf("<Client_%d> writing on FIFO2...\n", pid);
+                    write_fifo(fifo2FD, &part2, sizeof(part2));                    
+                    // realease mutex
+                    semOp(semid, MUTEX_FIFO2, 1);
 
                     // // 3. MSGQUEUE
                     // msgqueue_struct part3;
                     // part3.mtype = 1
                     // part3.mtext.pid = pid;
-                    // part3.mtext.path = g_files[child];                    
+                    // strncpy(part3.mtext.path, g_files[child], NAME_MAX);
 
                     // // 4. SHDMEM
                     // message_struct part4;
                     // part4.pid = pid;
-                    // part4.path = g_files[child];
+                    // strncpy(part4.path, g_files[child], NAME_MAX);
 
 
                     // close file
+                    printf("<Client_%d> closing the file %s...\n", pid, g_files[child]);
                     close(fd);
                     exit(0);
                 }
@@ -175,6 +186,6 @@ int main(int argc, char * argv[]) {
     } else {
         ErrExit("semget failed");
     }
-
+    printf("<Client_0> quitting...\n");
     return 0;
 }

@@ -37,7 +37,7 @@ void terminate_server() {
     remove_shared_memory(shmid);
 
     close_fifo(fifo1FD, g_fifo1);
-    //close_fifo(fifo2FD, g_fifo2);
+    close_fifo(fifo2FD, g_fifo2);
     exit(0);
 }
 
@@ -45,8 +45,9 @@ int main(int argc, char * argv[]) {
     // make FIFO1 and FIFO2
     printf("<Server> creating FIFO1 %s...\n", g_fifo1);
     make_fifo(g_fifo1);
-    // make_fifo(g_fifo2);
-    // printf("<Server> FIFO1 %s created\n", g_fifo2);
+    printf("<Server> creating FIFO2 %s...\n", g_fifo2);
+    make_fifo(g_fifo2);
+
 
     // create a MESSAGE QUEUE
     msqid = msgget(g_msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
@@ -60,7 +61,7 @@ int main(int argc, char * argv[]) {
     // attach the SHARED MEMORY SEGMENT in read/write mode
     shmPtr = (char *) attach_shared_memory(shmid, 0);
 
-    // create a semaphore set with 4 semapaphore
+    // create a semaphore set with 5 semapaphore
     printf("<Server> creating semaphore set...\n");
     semid = create_sem(g_semKey);
 
@@ -72,9 +73,9 @@ int main(int argc, char * argv[]) {
     while (1) {
         // open FIFO1 in read-only
         printf("<Server> waiting for the number of files...\n");
-        fifo1FD = open_fifo(g_fifo1, O_RDONLY);
 
         // read the number of files from FIFO1
+        fifo1FD = open_fifo(g_fifo1, O_RDONLY);
         int numFiles;
         int bR = read(fifo1FD, &numFiles, sizeof(numFiles));
         if (bR == -1) {
@@ -97,18 +98,31 @@ int main(int argc, char * argv[]) {
         semOp(semid, START_END, 1);
 
         // capire come far si che il server legga ciclicamente dalle ipcs
-        fifo1FD = open_fifo(g_fifo1, O_RDONLY);
+        while (1) {
+            fifo1FD = open_fifo(g_fifo1, O_RDONLY);
+            message_struct m1;
+            bR = read(fifo1FD, &m1, sizeof(m1));
+            if (bR == -1) {
+                printf("<Server> FIFO is broken\n");
+            }
+            if (close(fifo1FD) != 0) {
+                ErrExit("close failed");
+            }
 
-        message_struct m1;
-        bR = read(fifo1FD, &m1, sizeof(m1));
-        if (bR == -1) {
-            printf("<Server> FIFO is broken\n");
-        }
-        if (close(fifo1FD) != 0) {
-            ErrExit("close failed");
-        }
+            printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
 
-        printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+            fifo2FD = open_fifo(g_fifo2, O_RDONLY);
+            message_struct m2;
+            bR = read(fifo2FD, &m2, sizeof(m2));
+            if (bR == -1) {
+                printf("<Server> FIFO is broken\n");
+            }
+            if (close(fifo2FD) != 0) {
+                ErrExit("close failed");
+            }
+
+            printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
+        }
 
     }
 

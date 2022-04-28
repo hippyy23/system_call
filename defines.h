@@ -15,7 +15,8 @@
 #define START_END 0
 #define WAIT_CHILD 1
 #define MUTEX_SHM 2
-#define MUTEX_FIFO 3
+#define MUTEX_FIFO1 3
+#define MUTEX_FIFO2 4
 
 
 typedef struct message {
@@ -40,3 +41,4 @@ int g_shmVector[MAX_MESSAGES_PER_IPC];
 
 int open_fifo(char *, int);
 void write_fifo(int, message_struct *, int);
+void read_from_file(int, char *, int);
