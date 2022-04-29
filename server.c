@@ -18,7 +18,7 @@
 #include "fifo.h"
 
 
-char *shmPtr;
+message_struct *shmPtr;
 int shmid;
 int msqid;
 int semid;
@@ -58,7 +58,8 @@ int main(int argc, char * argv[]) {
     // allocate a SHARED MEMORY SEGMENT
     shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
-    shmPtr = (char *) attach_shared_memory(shmid, 0);
+    shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
+    define_shmVector();
 
     // create a semaphore set with 5 semapaphore
     printf("<Server> creating semaphore set...\n");
@@ -89,8 +90,8 @@ int main(int argc, char * argv[]) {
         initialize_sem(semid, numFiles);
 
         // write init signal '*' to client through shared memory
-        printf("<Server> writing '*' to client\n");
-        *shmPtr = '*';
+        printf("<Server> writing start signal to client\n");
+        shmPtr[0].pid = -23;
         semOp(semid, START_END, 1);
 
         // capire come far si che il server legga ciclicamente dalle ipcs
@@ -115,6 +116,12 @@ int main(int argc, char * argv[]) {
             }
 
             printf("[Parte 3, del file %s, spedita dal processo %d tramite MESSAGE QUEUE]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
+
+            message_struct m4;
+            m4 = shmPtr[0];
+            //read_shdm(&m4, shmPtr);
+
+            printf("[Parte 4, del file %s, spedita dal processo %d tramite SHARED MEMOMRY]\n%s\n", m4.path, m4.pid, m4.content);
         }
 
     }

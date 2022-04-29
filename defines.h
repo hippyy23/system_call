@@ -37,9 +37,12 @@ char *g_fifo2;
 int g_msgKey;
 int g_shmKey;
 int g_semKey;
-int g_shmVector[MAX_MESSAGES_PER_IPC];
+extern int *g_shmVector;
 
 int open_fifo(char *, int);
+void define_shmVector();
 void write_fifo(int, message_struct *, int);
 void read_from_file(int, char *, int);
 void read_message(int, message_struct *, int);
+// void write_shdm(message_struct *, message_struct *);
+// void read_shdm(message_struct *, message_struct *);

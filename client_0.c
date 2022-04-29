@@ -75,7 +75,7 @@ int main(int argc, char * argv[]) {
     // get the server's shared memory segment
     int shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
     // attach the shared memory segment
-    char *shmPtr = (char *) attach_shared_memory(shmid, 0);
+    message_struct *shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
 
     // get the semaphore set
     printf("<Client_0> getting server's semaphore set...\n");
@@ -84,8 +84,8 @@ int main(int argc, char * argv[]) {
     if (semid > 0) {
         // wait for response from server on shared memory segment
         semOp(semid, START_END, -1);
-        if (*shmPtr == '*') {
-            printf("<Client_0> recieved '*' from server\n");
+        if (shmPtr[0].pid == -23) {
+            printf("<Client_0> recieved start signal from server\n");
             for (int child = 0; child < numFiles; child++) {
                 pid_t pid = fork();
 
@@ -144,8 +144,6 @@ int main(int argc, char * argv[]) {
                     strncpy(part2.path, g_files[child], NAME_MAX);
                     // read from file a chunk of size 'size'
                     read_from_file(fd, part2.content, size);
-
-                    // wait for server
                     // write on FIFO2 the 2st part of the file of the size 'size'
                     printf("<Client_%d> writing on FIFO2...\n", pid);
                     write_fifo(fifo2FD, &part2, sizeof(part2));                    
@@ -171,6 +169,15 @@ int main(int argc, char * argv[]) {
                     strncpy(part4.path, g_files[child], NAME_MAX);
                     // read from file a chunk of size 'size'
                     read_from_file(fd, part4.content, size);
+                    // get mutex on shared memory
+                    //printf("<Client_%d> getting mutex on shared memory...\n", pid);
+                    //semOp(semid, MUTEX_SHM, -1);
+                    // write into the shared memory
+                    printf("<Client_%d> writing into the shared memory...\n", pid);
+                    shmPtr[0] = part4;
+                    //write_shdm(shmPtr, &part4);
+                    // release mutex
+                    //semOp(semid, MUTEX_SHM, 1);
 
                     // close file
                     printf("<Client_%d> closing the file %s...\n", pid, g_files[child]);
