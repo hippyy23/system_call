@@ -28,9 +28,6 @@ void write_fifo(int fd, message_struct *buffer, int size) {
     if (write(fd, buffer, size) != size) {
         ErrExit("write failed");
     }
-    if (close(fd) != 0) {
-        ErrExit("close failed");
-    }
 }
 
 void read_from_file(int fd, char *buffer, int size) {
@@ -43,8 +40,5 @@ void read_from_file(int fd, char *buffer, int size) {
 void read_message(int fd, message_struct *m, int size) {
     if (read(fd, m, size) == -1) {
         ErrExit("read failed");
-    }
-    if (close(fd) != 0) {
-        ErrExit("close failed");
     }
 }

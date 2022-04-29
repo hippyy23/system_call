@@ -60,7 +60,7 @@ int main(int argc, char * argv[]) {
     // attach the SHARED MEMORY SEGMENT in read/write mode
     shmPtr = (char *) attach_shared_memory(shmid, 0);
 
-    // create a semaphore set with 6 semapaphore
+    // create a semaphore set with 5 semapaphore
     printf("<Server> creating semaphore set...\n");
     semid = create_sem(g_semKey);
 
@@ -84,9 +84,6 @@ int main(int argc, char * argv[]) {
         } else {
             printf("<Server> number of files to be recieved %d\n", numFiles);
         }
-        if (close(fifo1FD) != 0) {
-            ErrExit("close failed");
-        }
 
         // initialize the semaphore
         initialize_sem(semid, numFiles);
@@ -97,20 +94,17 @@ int main(int argc, char * argv[]) {
         semOp(semid, START_END, 1);
 
         // capire come far si che il server legga ciclicamente dalle ipcs
+        fifo2FD = open_fifo(g_fifo2, O_RDONLY);
         while (1) {
-            semOp(semid, SYNC_SERVER, -1);
-            fifo1FD = open_fifo(g_fifo1, O_RDONLY);
+            semOp(semid, SYNC_FIFO1, -1);
             message_struct m1;
             read_message(fifo1FD, &m1, sizeof(m1));
-            semOp(semid, SYNC_FIFO1, 1);
 
             printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
 
-            // semOp(semid, SYNC_SERVER, -1);
-            fifo2FD = open_fifo(g_fifo2, O_RDONLY);
             message_struct m2;
+            semOp(semid, SYNC_FIFO2, -1);
             read_message(fifo2FD, &m2, sizeof(m2));
-            semOp(semid, SYNC_FIFO2, 1);
 
             printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
 

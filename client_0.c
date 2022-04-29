@@ -65,9 +65,6 @@ int main(int argc, char * argv[]) {
     if (write(fifo1FD, &numFiles, sizeof(numFiles)) != sizeof(numFiles)) {
         ErrExit("write failed");
     }
-    if (close(fifo1FD) != 0) {
-        ErrExit("close failed");
-    }
 
     int msqid = msgget(g_msgKey, 0);
     if (msqid == -1) {
@@ -83,7 +80,7 @@ int main(int argc, char * argv[]) {
     // get the semaphore set
     printf("<Client_0> getting server's semaphore set...\n");
     int semid = semget(g_semKey, 4, 0);
-    int fifo2FD;
+    int fifo2FD = open_fifo(g_fifo2, O_WRONLY);
     if (semid > 0) {
         // wait for response from server on shared memory segment
         semOp(semid, START_END, -1);
@@ -136,15 +133,10 @@ int main(int argc, char * argv[]) {
                     // read from file a chunk of size 'size'
                     printf("<Client_%d> reading content from file...\n", pid);
                     read_from_file(fd, part1.content, size);
-                    // wait for server
-                    semOp(semid, SYNC_FIFO1, -1);
-                    // open FIFO1
-                    printf("<Client_%d> opening FIFO1...\n", pid);
-                    fifo1FD = open_fifo(g_fifo1, O_WRONLY);
                     // write on FIFO1 the 1st part of the file of the size 'size'
                     printf("<Client_%d> writing on FIFO1...\n", pid);
-                    write_fifo(fifo1FD, &part1, sizeof(part1));                    
-                    // semOp(semid, SYNC_SERVER, 1);
+                    write_fifo(fifo1FD, &part1, sizeof(part1));               
+                    semOp(semid, SYNC_FIFO1, 1);
 
                     // 2. FIFO2
                     message_struct part2;
@@ -154,14 +146,10 @@ int main(int argc, char * argv[]) {
                     read_from_file(fd, part2.content, size);
 
                     // wait for server
-                    semOp(semid, SYNC_FIFO2, -1);
-                    // open FIFO2
-                    printf("<Client_%d> opening FIFO2...\n", pid);
-                    fifo2FD = open_fifo(g_fifo2, O_WRONLY);
                     // write on FIFO2 the 2st part of the file of the size 'size'
                     printf("<Client_%d> writing on FIFO2...\n", pid);
                     write_fifo(fifo2FD, &part2, sizeof(part2));                    
-                    semOp(semid, SYNC_SERVER, 1);
+                    semOp(semid, SYNC_FIFO2, 1);
                     
                     // 3. MSGQUEUE
                     msgqueue_struct part3;

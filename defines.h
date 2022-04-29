@@ -15,9 +15,8 @@
 #define START_END 0
 #define WAIT_CHILD 1
 #define MUTEX_SHM 2
-#define SYNC_SERVER 3
-#define SYNC_FIFO1 4
-#define SYNC_FIFO2 5
+#define SYNC_FIFO1 3
+#define SYNC_FIFO2 4
 
 
 typedef struct message {
