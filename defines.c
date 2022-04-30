@@ -15,14 +15,6 @@ char *g_fifo2 = "/tmp/fifo2";
 int g_msgKey = 1337;
 int g_shmKey = 228;
 int g_semKey = 23;
-int *g_shmVector;
-
-void define_shmVector() {
-    g_shmVector = malloc(sizeof(int) * MAX_MESSAGES_PER_IPC);
-    for (int i = 0; i < MAX_MESSAGES_PER_IPC; i++) {
-        g_shmVector[i] = 0;
-    }
-}
 
 int open_fifo(char *path, int flag) {
     int fd = open(path, flag);
@@ -51,18 +43,6 @@ void read_message(int fd, message_struct *m, int size) {
         ErrExit("read failed");
     }
 }
-
-// void write_shdm(message_struct *dest, message_struct *source) {
-//     int index = 0;
-//     while (g_shmVector[index] == 1) {
-//         index++;
-//         if (index == MAX_MESSAGES_PER_IPC) {
-//             index = 0;
-//         }
-//     }
-//     dest[index] = *source;
-//     g_shmVector[index] = 1;
-// }
 
 // void read_shdm(message_struct *dest, message_struct *source) {
 //     int index = 0;

@@ -20,9 +20,11 @@
 
 
 typedef struct message {
+    int section;
     char content[MAX_PAGE_SIZE];
     int pid;
     char path[NAME_MAX];
+    char mode[10];
 } message_struct;
 
 typedef struct msgqueue {
@@ -37,12 +39,9 @@ char *g_fifo2;
 int g_msgKey;
 int g_shmKey;
 int g_semKey;
-extern int *g_shmVector;
 
 int open_fifo(char *, int);
-void define_shmVector();
 void write_fifo(int, message_struct *, int);
 void read_from_file(int, char *, int);
 void read_message(int, message_struct *, int);
-// void write_shdm(message_struct *, message_struct *);
 // void read_shdm(message_struct *, message_struct *);

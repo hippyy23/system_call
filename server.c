@@ -16,6 +16,7 @@
 #include "shared_memory.h"
 #include "semaphore.h"
 #include "fifo.h"
+#include "server_functions.h"
 
 
 message_struct *shmPtr;
@@ -38,6 +39,11 @@ void terminate_server() {
 
     close_fifo(fifo1FD, g_fifo1);
     close_fifo(fifo2FD, g_fifo2);
+
+    free(container_fifo1);
+    free(container_fifo2);
+    free(container_msgq);
+    free(container_shdm);
     exit(0);
 }
 
@@ -59,7 +65,6 @@ int main(int argc, char * argv[]) {
     shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
     shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
-    define_shmVector();
 
     // create a semaphore set with 5 semapaphore
     printf("<Server> creating semaphore set...\n");
@@ -75,6 +80,7 @@ int main(int argc, char * argv[]) {
         printf("<Server> waiting for the number of files...\n");
 
         // read the number of files from FIFO1
+        //sleep(3);
         fifo1FD = open_fifo(g_fifo1, O_RDONLY);
         int numFiles;
         int bR = read(fifo1FD, &numFiles, sizeof(numFiles));
@@ -92,37 +98,42 @@ int main(int argc, char * argv[]) {
         // write init signal '*' to client through shared memory
         printf("<Server> writing start signal to client\n");
         shmPtr[0].pid = -23;
-        semOp(semid, START_END, 1);
 
-        // capire come far si che il server legga ciclicamente dalle ipcs
+        initialize_space_for_msg(numFiles);
+        
         fifo2FD = open_fifo(g_fifo2, O_RDONLY);
-        while (1) {
+        for (int i = 0; 0 < numFiles; numFiles--, i++) {
             semOp(semid, SYNC_FIFO1, -1);
             message_struct m1;
             read_message(fifo1FD, &m1, sizeof(m1));
+            container_fifo1[i] = m1;
 
-            printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+            printf("[Parte %d, del file %s, spedita dal processo %d tramite %s]\n%s\n", m1.section, m1.path, m1.pid, m1.mode, m1.content);
 
             message_struct m2;
             semOp(semid, SYNC_FIFO2, -1);
             read_message(fifo2FD, &m2, sizeof(m2));
+            container_fifo2[i] = m2;
 
-            printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
+            printf("[Parte %d, del file %s, spedita dal processo %d tramite %s]\n%s\n", m2.section, m2.path, m2.pid, m2.mode, m2.content);
 
             msgqueue_struct m3;
             size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
             if (msgrcv(msqid, &m3, mSize, 1, 0) == -1) {
                 ErrExit("msgrcv failed");
             }
+            container_msgq[i] = m3;
 
-            printf("[Parte 3, del file %s, spedita dal processo %d tramite MESSAGE QUEUE]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
+            printf("[Parte %d, del file %s, spedita dal processo %d tramite %s]\n%s\n", m3.mtext.section, m3.mtext.path, m3.mtext.pid, m3.mtext.mode, m3.mtext.content);
 
-            message_struct m4;
-            m4 = shmPtr[0];
-            //read_shdm(&m4, shmPtr);
+            // message_struct m4;
+            // read_shdm(&m4, shmPtr);
+            // container_shdm[i] = m4;
 
-            printf("[Parte 4, del file %s, spedita dal processo %d tramite SHARED MEMOMRY]\n%s\n", m4.path, m4.pid, m4.content);
+            // printf("[Parte 4, del file %s, spedita dal processo %d tramite SHARED MEMOMRY]\n%s\n", m4.path, m4.pid, m4.content);
         }
+
+        
 
     }
 

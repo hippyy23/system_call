@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/sem.h>
@@ -30,6 +31,8 @@ int main(int argc, char * argv[]) {
         return 0;
     }
     g_wd = argv[1];
+    
+    g_shmVector = malloc(sizeof(int) * 50);
 
     // create a mask to block all signals but SIGINT and SIGUSR1
     // set of signals
@@ -76,121 +79,127 @@ int main(int argc, char * argv[]) {
     int shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
     // attach the shared memory segment
     message_struct *shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
-
+    errno = 0;
     // get the semaphore set
     printf("<Client_0> getting server's semaphore set...\n");
-    int semid = semget(g_semKey, 4, 0);
+    int semid = semget(g_semKey, 5, 0);
+    printf("Oh no something went wrong... %s\n", strerror(errno));
     int fifo2FD = open_fifo(g_fifo2, O_WRONLY);
-    if (semid > 0) {
+    if (semid != -1) {
         // wait for response from server on shared memory segment
-        semOp(semid, START_END, -1);
-        if (shmPtr[0].pid == -23) {
-            printf("<Client_0> recieved start signal from server\n");
-            for (int child = 0; child < numFiles; child++) {
-                pid_t pid = fork();
+        while (shmPtr[0].pid != -23);
+        printf("<Client_0> recieved start signal from server\n");
+        for (int child = 0; child < numFiles; child++) {
+            pid_t pid = fork();
 
-                if (pid == -1) {
-                    ErrExit("fork failed");
-                // check whether the running process is the parent or the child
-                } else if (pid == 0) {
-                    // code executed only by the child
-                    pid_t pid = getpid();
-                    // OPEN FILE
-                    int fd = open(g_files[child], O_RDONLY, S_IRUSR);
-                    if (fd == -1) {
-                        ErrExit("open failed");
-                    }
-
-                    // CHECK THE NUMBER OF CHARS
-                    int numChars = check_num_chars_in_file(fd);
-                    // printf("<Client_%d> number of chars found %d\n", pid, numChars);
-
-                    // GET THE SIZE OF EACH PART
-                    // we have problems with len < 10 (5, 6, 9)
-                    // if 5 - 2 1 1 1
-                    // if 6 - 3 1 1 1
-                    // if 9 - 3 2 2 2
-                    // for the rest use ceil(numChars / 4)
-                    int size = ceil(numChars / 4);
-                    // printf("<Client_%d> size %d\n", pid, size);
-                    // switch (numChars) {
-                    //     case 5:
-                    //     case 6:
-                    //     case 9:
-                    //     default:
-                    // }
-
-                    // BLOCK ALL CHILDS UNTIL EVERYONE HAS REACHED THIS POINT
-                    semOp(semid, WAIT_CHILD, -1);
-                    semOp(semid, WAIT_CHILD, 0);
-
-                    // SEND EACH PART THROUGH IPCS
-
-                    // 1. FIFO1
-                    message_struct part1;
-                    part1.pid = pid;
-                    strncpy(part1.path, g_files[child], NAME_MAX);
-                    // read from file a chunk of size 'size'
-                    printf("<Client_%d> reading content from file...\n", pid);
-                    read_from_file(fd, part1.content, size);
-                    // write on FIFO1 the 1st part of the file of the size 'size'
-                    printf("<Client_%d> writing on FIFO1...\n", pid);
-                    write_fifo(fifo1FD, &part1, sizeof(part1));               
-                    semOp(semid, SYNC_FIFO1, 1);
-
-                    // 2. FIFO2
-                    message_struct part2;
-                    part2.pid = pid;
-                    strncpy(part2.path, g_files[child], NAME_MAX);
-                    // read from file a chunk of size 'size'
-                    read_from_file(fd, part2.content, size);
-                    // write on FIFO2 the 2st part of the file of the size 'size'
-                    printf("<Client_%d> writing on FIFO2...\n", pid);
-                    write_fifo(fifo2FD, &part2, sizeof(part2));                    
-                    semOp(semid, SYNC_FIFO2, 1);
-                    
-                    // 3. MSGQUEUE
-                    msgqueue_struct part3;
-                    part3.mtype = 1;
-                    part3.mtext.pid = pid;
-                    strncpy(part3.mtext.path, g_files[child], NAME_MAX);
-                    // read from file a chunk of size 'size'
-                    read_from_file(fd, part3.mtext.content, size);
-                    // send the message to the server
-                    printf("<Client_%d> sending message through msgqueue...\n", pid);
-                    size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
-                    if (msgsnd(msqid, &part3, mSize, 0) == -1) {
-                        ErrExit("msgsnd failed");
-                    }
-
-                    // 4. SHDMEM
-                    message_struct part4;
-                    part4.pid = pid;
-                    strncpy(part4.path, g_files[child], NAME_MAX);
-                    // read from file a chunk of size 'size'
-                    read_from_file(fd, part4.content, size);
-                    // get mutex on shared memory
-                    //printf("<Client_%d> getting mutex on shared memory...\n", pid);
-                    //semOp(semid, MUTEX_SHM, -1);
-                    // write into the shared memory
-                    printf("<Client_%d> writing into the shared memory...\n", pid);
-                    shmPtr[0] = part4;
-                    //write_shdm(shmPtr, &part4);
-                    // release mutex
-                    //semOp(semid, MUTEX_SHM, 1);
-
-                    // close file
-                    printf("<Client_%d> closing the file %s...\n", pid, g_files[child]);
-                    close(fd);
-                    exit(0);
+            if (pid == -1) {
+                ErrExit("fork failed");
+            // check whether the running process is the parent or the child
+            } else if (pid == 0) {
+                // code executed only by the child
+                pid_t pid = getpid();
+                // OPEN FILE
+                int fd = open(g_files[child], O_RDONLY, S_IRUSR);
+                if (fd == -1) {
+                    ErrExit("open failed");
                 }
+
+                // CHECK THE NUMBER OF CHARS
+                int numChars = check_num_chars_in_file(fd);
+                // printf("<Client_%d> number of chars found %d\n", pid, numChars);
+
+                // GET THE SIZE OF EACH PART
+                // we have problems with len < 10 (5, 6, 9)
+                // if 5 - 2 1 1 1
+                // if 6 - 3 1 1 1
+                // if 9 - 3 2 2 2
+                // for the rest use ceil(numChars / 4)
+                int size = ceil(numChars / 4);
+                // printf("<Client_%d> size %d\n", pid, size);
+                // switch (numChars) {
+                //     case 5:
+                //     case 6:
+                //     case 9:
+                //     default:
+                // }
+
+                // BLOCK ALL CHILDS UNTIL EVERYONE HAS REACHED THIS POINT
+                semOp(semid, WAIT_CHILD, -1);
+                semOp(semid, WAIT_CHILD, 0);
+
+                // SEND EACH PART THROUGH IPCS
+
+                // 1. FIFO1
+                message_struct part1;
+                part1.section = 1;
+                part1.pid = pid;
+                strcpy(part1.mode, "FIFO1");
+                strncpy(part1.path, g_files[child], NAME_MAX);
+                // read from file a chunk of size 'size'
+                printf("<Client_%d> reading content from file...\n", pid);
+                read_from_file(fd, part1.content, size);
+                // write on FIFO1 the 1st part of the file of the size 'size'
+                printf("<Client_%d> writing on FIFO1...\n", pid);
+                write_fifo(fifo1FD, &part1, sizeof(part1));               
+                semOp(semid, SYNC_FIFO1, 1);
+
+                // 2. FIFO2
+                message_struct part2;
+                part2.section = 2;
+                part2.pid = pid;
+                strcpy(part2.mode, "FIFO2");
+                strncpy(part2.path, g_files[child], NAME_MAX);
+                // read from file a chunk of size 'size'
+                read_from_file(fd, part2.content, size);
+                // write on FIFO2 the 2st part of the file of the size 'size'
+                printf("<Client_%d> writing on FIFO2...\n", pid);
+                write_fifo(fifo2FD, &part2, sizeof(part2));                    
+                semOp(semid, SYNC_FIFO2, 1);
+                
+                // 3. MSGQUEUE
+                msgqueue_struct part3;
+                part3.mtext.section = 3;
+                part3.mtype = 1;
+                part3.mtext.pid = pid;
+                strcpy(part3.mtext.mode, "msgQueue");
+                strncpy(part3.mtext.path, g_files[child], NAME_MAX);
+                // read from file a chunk of size 'size'
+                read_from_file(fd, part3.mtext.content, size);
+                // send the message to the server
+                printf("<Client_%d> sending message through msgqueue...\n", pid);
+                size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+                if (msgsnd(msqid, &part3, mSize, 0) == -1) {
+                    ErrExit("msgsnd failed");
+                }
+
+                // 4. SHDMEM
+                // message_struct part4;
+                // part4.section = 4;
+                // part4.pid = pid;
+                // strcpy(part4.mode, "ShdMem");
+                // strncpy(part4.path, g_files[child], NAME_MAX);
+                // // read from file a chunk of size 'size'
+                // read_from_file(fd, part4.content, size);
+                // // get mutex on shared memory
+                // printf("<Client_%d> getting mutex on shared memory...\n", pid);
+                // semOp(semid, MUTEX_SHM, -1);
+                // // write into the shared memory
+                // printf("<Client_%d> writing into the shared memory...\n", pid);
+                // write_shdm(shmPtr, &part4);
+                // // // release mutex
+                // semOp(semid, MUTEX_SHM, 1);
+
+                // close file
+                printf("<Client_%d> closing the file %s...\n", pid, g_files[child]);
+                close(fifo1FD);
+                close(fifo2FD);
+                close(fd);
+                exit(0);
             }
-            // code executed only by the parent
-            // wait the termination of all child processes
-            while(wait(NULL) != -1);
-        } else {
-            ErrExit("Oops... something went wrong");
         }
+        // code executed only by the parent
+        // wait the termination of all child processes
+        while(wait(NULL) != -1);
     } else {
         ErrExit("semget failed");
     }

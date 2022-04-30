@@ -111,17 +111,8 @@ size_t append_path(char *dir) {
 }
 
 int check_file_name(char *file, char *str) {
-    if (file == NULL || str == NULL) {
-        return 0;
-    } else {
-        for (int i = 0; i < 5; i++) {
-            if (file[i] != str[i]) {
-                return 0;
-            }
-        }
-    }
-
-    return 1;
+    return (file == NULL || str == NULL) ?
+        0 : strncmp(file, str, 7) == 0;
 }
 
 int check_file_size(char *pathname, off_t size) {
@@ -140,7 +131,7 @@ int check_file_size(char *pathname, off_t size) {
 int get_num_files() {
     int n = 0;
 
-    for (int i = 0; strcmp(g_files[i], ""); i++) {
+    for (int i = 0; strcmp(g_files[i], "") != 0; i++) {
         n++;
     }
 
@@ -162,6 +153,17 @@ int check_num_chars_in_file(int fd) {
     } while (bR > 0);
     lseek(fd, 0, SEEK_SET);
 
-
     return count - 1;
+}
+
+void write_shdm(message_struct *dest, message_struct *source) {
+    int index = 0;
+    while (g_shmVector[index] == 1) {
+        index++;
+        if (index == MAX_MESSAGES_PER_IPC) {
+            index = 0;
+        }
+    }
+    dest[index] = *source;
+    g_shmVector[index] = 1;
 }
