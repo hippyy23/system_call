@@ -99,6 +99,7 @@ int main(int argc, char * argv[]) {
                 // code executed only by the child
                 pid_t pid = getpid();
                 // OPEN FILE
+                printf("<Client_%d> opening file %s\n", pid, g_files[child]);
                 int fd = open(g_files[child], O_RDONLY, S_IRUSR);
                 if (fd == -1) {
                     ErrExit("open failed");
@@ -131,9 +132,7 @@ int main(int argc, char * argv[]) {
 
                 // 1. FIFO1
                 message_struct part1;
-                part1.section = 1;
                 part1.pid = pid;
-                strcpy(part1.mode, "FIFO1");
                 strncpy(part1.path, g_files[child], NAME_MAX);
                 // read from file a chunk of size 'size'
                 printf("<Client_%d> reading content from file...\n", pid);
@@ -145,9 +144,7 @@ int main(int argc, char * argv[]) {
 
                 // 2. FIFO2
                 message_struct part2;
-                part2.section = 2;
                 part2.pid = pid;
-                strcpy(part2.mode, "FIFO2");
                 strncpy(part2.path, g_files[child], NAME_MAX);
                 // read from file a chunk of size 'size'
                 read_from_file(fd, part2.content, size);
@@ -158,10 +155,8 @@ int main(int argc, char * argv[]) {
                 
                 // 3. MSGQUEUE
                 msgqueue_struct part3;
-                part3.mtext.section = 3;
                 part3.mtype = 1;
                 part3.mtext.pid = pid;
-                strcpy(part3.mtext.mode, "msgQueue");
                 strncpy(part3.mtext.path, g_files[child], NAME_MAX);
                 // read from file a chunk of size 'size'
                 read_from_file(fd, part3.mtext.content, size);
@@ -174,9 +169,7 @@ int main(int argc, char * argv[]) {
 
                 // 4. SHDMEM
                 // message_struct part4;
-                // part4.section = 4;
                 // part4.pid = pid;
-                // strcpy(part4.mode, "ShdMem");
                 // strncpy(part4.path, g_files[child], NAME_MAX);
                 // // read from file a chunk of size 'size'
                 // read_from_file(fd, part4.content, size);

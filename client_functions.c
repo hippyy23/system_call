@@ -79,7 +79,8 @@ void search(int pos) {
             if (check_file_name(dentry->d_name, "sendme_") && check_file_size(g_wd, MAX_FILE_SIZE)) {
                 strncpy(g_files[pos], g_wd, NAME_MAX);
                 // TO BE REMOVED
-                printf("%s\n", g_files[pos]);
+                //printf("%s\n", g_files[pos]);
+                printf("%s\n", g_wd);
                 pos++;
                 
                 if (pos > MAX_FILES) {

@@ -20,11 +20,9 @@
 
 
 typedef struct message {
-    int section;
     char content[MAX_PAGE_SIZE];
     int pid;
     char path[NAME_MAX];
-    char mode[10];
 } message_struct;
 
 typedef struct msgqueue {
