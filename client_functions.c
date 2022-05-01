@@ -15,6 +15,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/msg.h>
 
 #include "client_functions.h"
 #include "defines.h"
@@ -22,23 +23,26 @@
 
 
 void block_all_signals() {
-    // set of signals
-    sigset_t signalSet;
-    // initialize signalSet
-    sigfillset(&signalSet);
-    // block all signals
-    sigprocmask(SIG_SETMASK, &signalSet, NULL);
+    // add removed signals to the set
+    sigaddset(&signalSet, SIGINT);
+    sigaddset(&signalSet, SIGUSR1);    
+    // update the mask with the signals to be blocked
+    sigprocmask(SIG_BLOCK, &signalSet, &oldSet);
     printf("<Client_0> all signals blocked!\n");
 }
 
-void terminate_client0() {
-    printf("<Client_0> Quitting...\n");
-    _exit(0);
+void unlock_signals() {
+    // update the mask
+    sigprocmask(SIG_SETMASK, &oldSet, NULL);
 }
 
-void start_client0() {
+void terminate_client0(int sig) {
+    printf("<Client_0> Quitting...\n");
+    exit(0);
+}
+
+void start_client0(int sig) {
     printf("<Client_0> Starting...\n");
-    block_all_signals();
 
     // change the current working directory
     if (chdir(g_wd) == -1)
@@ -157,14 +161,61 @@ int check_num_chars_in_file(int fd) {
     return count - 1;
 }
 
-void write_shdm(message_struct *dest, message_struct *source) {
-    int index = 0;
-    while (g_shmVector[index] == 1) {
-        index++;
-        if (index == MAX_MESSAGES_PER_IPC) {
-            index = 0;
-        }
+void write_fifo(int fifoFD, int fileFD, int pid, int index, int size) {
+    message_struct m;
+    m.pid = pid;
+    strncpy(m.path, g_files[index], NAME_MAX);
+    // read from file a chunk of size 'size'
+    printf("<Client_%d> reading content from file...\n", pid);
+    read_from_file(fileFD, m.content, size);
+
+    if (write(fifoFD, &m, sizeof(m)) == -1) {
+        ErrExit("write failed");
     }
-    dest[index] = *source;
-    g_shmVector[index] = 1;
+}
+
+void write_msgq(int msqid, int fileFD, int pid, int index, int size) {
+    msgqueue_struct m;
+    m.mtype = 1;
+    m.mtext.pid = pid;
+    strncpy(m.mtext.path, g_files[index], NAME_MAX);
+    // read from file a chunk of size 'size'
+    read_from_file(fileFD, m.mtext.content, size);
+
+    // send the message to the server
+    size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+    if (msgsnd(msqid, &m, mSize, 0) == -1) {
+        ErrExit("msgsnd failed");
+    }
+}
+
+// void write_shdm(message_struct *dest, message_struct *source) {
+//     int index = 0;
+//     while (g_shmVector[index] == 1) {
+//         index++;
+//         if (index == MAX_MESSAGES_PER_IPC) {
+//             index = 0;
+//         }
+//     }
+//     dest[index] = *source;
+//     g_shmVector[index] = 1;
+// }
+
+// void read_shdm(message_struct *dest, message_struct *source) {
+//     int index = 0;
+//     while (g_shmVector[index] == 0) {
+//         index++;
+//         if (index == MAX_MESSAGES_PER_IPC) {
+//             index = 0;
+//         }
+//     }
+//     *dest = source[index];
+//     g_shmVector[index] = 0;
+// }
+
+void read_from_file(int fd, char *buffer, int size) {
+    if (read(fd, buffer, size) == -1) {
+        ErrExit("read failed");
+    }
+    buffer[size] = '\0';
 }

@@ -39,7 +39,3 @@ int g_shmKey;
 int g_semKey;
 
 int open_fifo(char *, int);
-void write_fifo(int, message_struct *, int);
-void read_from_file(int, char *, int);
-void read_message(int, message_struct *, int);
-// void read_shdm(message_struct *, message_struct *);

@@ -27,5 +27,7 @@ void close_fifo(int fifoFD, char *fifoPath) {
     }
     if (unlink(fifoPath) != 0) {
         ErrExit("unlink failed");
+    } else {
+        printf("<Server> FIFO removed successfully\n");
     }
 }

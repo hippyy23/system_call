@@ -35,6 +35,8 @@ void initialize_sem(int semid, int num_child) {
 void remove_sem(int semid) {
     if (semctl(semid, 0, IPC_RMID, 0) == -1) {
         ErrExit("semctl IPC_RMID failed");
+    } else {
+        printf("<Server> Semaphore Set removed successfully\n");
     }
 }
 

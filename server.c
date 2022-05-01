@@ -27,13 +27,10 @@ int fifo1FD;
 int fifo2FD;
 
 void terminate_server() {
-    if (msqid > 0) {
-        if (msgctl(msqid, IPC_RMID, NULL) == -1)
-            ErrExit("msgctl failed");
-        else
-            printf("<Server> message queue removed successfully\n");
-    }
+    remove_msgq(msqid);
+
     remove_sem(semid);
+
     free_shared_memory(shmPtr);
     remove_shared_memory(shmid);
 
@@ -44,6 +41,7 @@ void terminate_server() {
     free(container_fifo2);
     free(container_msgq);
     free(container_shdm);
+
     exit(0);
 }
 
@@ -105,14 +103,14 @@ int main(int argc, char * argv[]) {
         for (int i = 0; i < numFiles; i++) {
             semOp(semid, SYNC_FIFO1, -1);
             message_struct m1;
-            read_message(fifo1FD, &m1, sizeof(m1));
+            read_fifo(fifo1FD, &m1, sizeof(m1));
             container_fifo1[i] = m1;
 
             printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
 
             message_struct m2;
             semOp(semid, SYNC_FIFO2, -1);
-            read_message(fifo2FD, &m2, sizeof(m2));
+            read_fifo(fifo2FD, &m2, sizeof(m2));
             container_fifo2[i] = m2;
 
             printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
@@ -126,15 +124,23 @@ int main(int argc, char * argv[]) {
 
             printf("[Parte 3, del file %s, spedita dal processo %d tramite MsgQueue]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
 
-            // message_struct m4;
-            // read_shdm(&m4, shmPtr);
-            // container_shdm[i] = m4;
+            message_struct m4;
+            // // read_shdm(&m4, shmPtr);
+            // m4 = shmPtr[0];
+            container_shdm[i] = m4;
 
             // printf("[Parte 4, del file %s, spedita dal processo %d tramite ShdMem]\n%s\n", m4.path, m4.pid, m4.content);
         }
 
-        write_messages_to_files(numFiles);
+        // write_messages_to_files(numFiles);
 
+        printf("<Server> sending end message to client\n\n");
+        msgqueue_struct end;
+        end.mtype = 1337;
+        size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+        if (msgsnd(msqid, &end, mSize, 0) == -1) {
+            ErrExit("msgsnd failed");
+        }
     }
 
     return 0;

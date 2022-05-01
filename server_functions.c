@@ -8,6 +8,7 @@
 #include <fcntl.h>
 
 #include <sys/stat.h>
+#include <sys/msg.h>
 
 #include "server_functions.h"
 #include "defines.h"
@@ -17,12 +18,14 @@
 void initialize_space_for_msg(int numFiles) {
     container_fifo1 = malloc(sizeof(message_struct) * numFiles);
     container_fifo2 = malloc(sizeof(message_struct) * numFiles);
-    container_msgq = malloc(sizeof(message_struct) * numFiles);
+    container_msgq = malloc(sizeof(msgqueue_struct) * numFiles);
     container_shdm = malloc(sizeof(message_struct) * numFiles);
 
     if (container_fifo1 == NULL || container_fifo2 == NULL || 
     container_msgq == NULL || container_shdm == NULL) {
-        ErrExit("malloca failed");
+        ErrExit("malloc failed");
+    } else {
+        printf("<Server> allocated space for messages\n");
     }
 }
 
@@ -91,5 +94,22 @@ void write_to_file_msgq(int fd, msgqueue_struct *m, int section, char mode[]) {
     int bR = write(fd, buffer, n);
     if (bR == -1) {
         ErrExit("write failed");
+    }
+}
+
+void read_fifo(int fd, message_struct *m, int size) {
+    if (read(fd, m, size) == -1) {
+        ErrExit("read failed");
+    }
+}
+
+void remove_msgq(int msqid) {
+    if (msqid > 0) {
+        if (msgctl(msqid, IPC_RMID, NULL) == -1) {
+            ErrExit("msgctl failed");
+        }
+        else {
+            printf("<Server> Message Queue removed successfully\n");
+        }
     }
 }
