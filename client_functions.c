@@ -84,7 +84,7 @@ void search(int pos) {
                 strncpy(g_files[pos], g_wd, NAME_MAX);
                 // TO BE REMOVED
                 //printf("%s\n", g_files[pos]);
-                printf("%s\n", g_wd);
+                //printf("%s\n", g_wd);
                 pos++;
                 
                 if (pos > MAX_FILES) {
@@ -158,64 +158,68 @@ int check_num_chars_in_file(int fd) {
     } while (bR > 0);
     lseek(fd, 0, SEEK_SET);
 
-    return count - 1;
+    return count;
 }
 
-void write_fifo(int fifoFD, int fileFD, int pid, int index, int size) {
-    message_struct m;
-    m.pid = pid;
-    strncpy(m.path, g_files[index], NAME_MAX);
-    // read from file a chunk of size 'size'
-    printf("<Client_%d> reading content from file...\n", pid);
-    read_from_file(fileFD, m.content, size);
-
-    if (write(fifoFD, &m, sizeof(m)) == -1) {
+void write_fifo(int fifoFD, message_struct *m) {
+    // write message on fifo
+    if (write(fifoFD, m, sizeof(message_struct)) == -1) {
         ErrExit("write failed");
     }
 }
 
-void write_msgq(int msqid, int fileFD, int pid, int index, int size) {
+void write_msgq(int msqid, msgqueue_struct *m) {
+    // send the message to the server
+    size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+    if (msgsnd(msqid, m, mSize, 0) == -1) {
+        ErrExit("msgsnd failed");
+    }
+}
+
+void write_shdm(message_struct *src, message_struct *dest, short *shmArr) {
+    // write the message on shared memory
+    int index = 0;
+    while (shmArr[index] == 1) {
+        index++;
+        if (index == MAX_MESSAGES_PER_IPC) {
+            index = 0;
+        }
+    }
+    dest[index] = *src;
+    shmArr[index] = 1;
+}
+
+void read_from_file(int fd, char *buffer, int size) {
+    int n = read(fd, buffer, size);
+    if (n == -1) {
+        ErrExit("read failed");
+    }
+    printf("Bytes read: %d\n", n);
+    buffer[n] = '\0';
+}
+
+message_struct create_message_struct(int fileFD, int pid, int index, int size) {
+    // initialize the struct of the message
+    message_struct m;
+    // write the pid into the message
+    m.pid = pid;
+    // write the path into the message
+    strncpy(m.path, g_files[index], NAME_MAX);
+    // read from file a chunk of size 'size'
+    read_from_file(fileFD, m.content, size);
+
+    return m;
+}
+
+msgqueue_struct create_msgqueue_struct(int fileFD, int pid, int index, int size) {
+     // initialize the struct of the message
     msgqueue_struct m;
     m.mtype = 1;
+    // write the pid into the message
     m.mtext.pid = pid;
     strncpy(m.mtext.path, g_files[index], NAME_MAX);
     // read from file a chunk of size 'size'
     read_from_file(fileFD, m.mtext.content, size);
 
-    // send the message to the server
-    size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
-    if (msgsnd(msqid, &m, mSize, 0) == -1) {
-        ErrExit("msgsnd failed");
-    }
-}
-
-// void write_shdm(message_struct *dest, message_struct *source) {
-//     int index = 0;
-//     while (g_shmVector[index] == 1) {
-//         index++;
-//         if (index == MAX_MESSAGES_PER_IPC) {
-//             index = 0;
-//         }
-//     }
-//     dest[index] = *source;
-//     g_shmVector[index] = 1;
-// }
-
-// void read_shdm(message_struct *dest, message_struct *source) {
-//     int index = 0;
-//     while (g_shmVector[index] == 0) {
-//         index++;
-//         if (index == MAX_MESSAGES_PER_IPC) {
-//             index = 0;
-//         }
-//     }
-//     *dest = source[index];
-//     g_shmVector[index] = 0;
-// }
-
-void read_from_file(int fd, char *buffer, int size) {
-    if (read(fd, buffer, size) == -1) {
-        ErrExit("read failed");
-    }
-    buffer[size] = '\0';
+    return m;
 }

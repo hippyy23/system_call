@@ -15,7 +15,6 @@
 // 2d array to contain the path of MAX_FILES files
 char g_files[MAX_FILES][NAME_MAX];
 char *g_wd;
-int *g_shmVector;
 sigset_t signalSet;
 sigset_t oldSet;
 
@@ -31,7 +30,8 @@ int check_num_chars_in_file(int);
 void search(int);
 int get_num_files();
 void read_from_file(int, char *, int);
-void write_fifo(int, int, int, int, int);
-void write_shdm(message_struct *, message_struct *);
-void write_msgq(int, int, int, int, int);
-// void read_shdm(message_struct *, message_struct *);
+message_struct create_message_struct(int fileFD, int pid, int index, int size);
+msgqueue_struct create_msgqueue_struct(int fileFD, int pid, int index, int size);
+void write_fifo(int fifoFD, message_struct *m);
+void write_msgq(int msqid, msgqueue_struct *m);
+void write_shdm(message_struct *src, message_struct *dest, short *shmArr);

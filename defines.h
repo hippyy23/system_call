@@ -12,7 +12,7 @@
 #define MAX_PAGE_SIZE 1024
 #define MAX_MESSAGES_PER_IPC 50
 
-#define START_END 0
+#define SYNC_SHM 0
 #define WAIT_CHILD 1
 #define MUTEX_SHM 2
 #define SYNC_FIFO1 3

@@ -31,8 +31,6 @@ int main(int argc, char * argv[]) {
         return 0;
     }
     g_wd = argv[1];
-    
-    // g_shmVector = malloc(sizeof(int) * 50);
 
     // create a mask to block all signals but SIGINT and SIGUSR1
     // initialize signalSet
@@ -77,13 +75,17 @@ int main(int argc, char * argv[]) {
         printf("<Client_0> getting server's shared memory segment...\n");
         // get the server's shared memory segment
         int shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
-        // attach the shared memory segment
+        // attach the SHARED MEMORY SEGMENT in read/write mode
         message_struct *shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
-        errno = 0;
+        // attach an additional pointer to SHARED MEMORY SEGMENT
+        // to handle the SHARED MEMORY SEGMENT allocation
+        short *shmArr = (short *) attach_shared_memory(shmid, 0);
+        // move the pointer to where the array of "short" starts
+        shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
+
         // get the semaphore set
         printf("<Client_0> getting server's semaphore set...\n");
         int semid = semget(g_semKey, 5, 0);
-        printf("Oh no something went wrong... %s\n", strerror(errno)); // TO BE REMOVED
         int fifo2FD = open_fifo(g_fifo2, O_WRONLY);
         if (semid != -1) {
             // wait for response from server on shared memory segment
@@ -91,6 +93,8 @@ int main(int argc, char * argv[]) {
             printf("<Client_0> recieved start signal from server\n");
             for (int child = 0; child < numFiles; child++) {
                 pid_t pid = fork();
+                message_struct m;
+                msgqueue_struct mq;
 
                 if (pid == -1) {
                     ErrExit("fork failed");
@@ -119,7 +123,6 @@ int main(int argc, char * argv[]) {
                     // if 9 - 3 2 2 2
                     // for the rest use ceil(numChars / 4)
                     int size = ceil(((float) numChars) / 4);
-                    printf("<Client_%d> size %d\n", pid, size);
 
                     // BLOCK ALL CHILDS UNTIL EVERYONE HAS REACHED THIS POINT
                     semOp(semid, WAIT_CHILD, -1);
@@ -131,93 +134,145 @@ int main(int argc, char * argv[]) {
                             // 1. FIFO1
                             // write on FIFO1 the 1st part of the file of the size 2
                             printf("<Client_%d> writing on FIFO1...\n", pid);
-                            write_fifo(fifo1FD, fileFD, pid, child, 2);               
+                            m = create_message_struct(fileFD, pid, child, 2);
+                            write_fifo(fifo1FD, &m);
                             semOp(semid, SYNC_FIFO1, 1);
 
                             // 2. FIFO2
                             // write on FIFO2 the 2nd part of the file of the size 1
                             printf("<Client_%d> writing on FIFO2...\n", pid);
-                            write_fifo(fifo2FD, fileFD, pid, child, 1);          
+                            m = create_message_struct(fileFD, pid, child, 1);
+                            write_fifo(fifo2FD, &m);
                             semOp(semid, SYNC_FIFO2, 1);
 
                             // 3. MSGQUEUE
+                            // send through MsgQueue the 2nd part of the file of the size 1
                             printf("<Client_%d> sending message through msgqueue...\n", pid);
-                            write_msgq(msqid, fileFD, pid, child, 1);
+                            mq = create_msgqueue_struct(fileFD, pid, child, 1);
+                            write_msgq(msqid, &mq);
+
+                            // 4. SHDMEM
+                            // write on shared memory the 4th part of the file of the size 1
+                            m = create_message_struct(fileFD, pid, child, 1);
+                            // get mutex on shared memory
+                            printf("<Client_%d> getting mutex on shared memory...\n", pid);
+                            semOp(semid, MUTEX_SHM, -1);
+                            printf("<Client_%d> writing on shared memory...\n", pid);
+                            write_shdm(&m, shmPtr, shmArr);
+                            // realease mutex
+                            printf("<Client_%d> releasing mutex...\n", pid);
+                            semOp(semid, SYNC_SHM, 1);
+                            semOp(semid, MUTEX_SHM, 1);
                             break;
                         case 6:
                             // 1. FIFO1
                             // write on FIFO1 the 1st part of the file of the size 3'
                             printf("<Client_%d> writing on FIFO1...\n", pid);
-                            write_fifo(fifo1FD, fileFD, pid, child, 3);               
+                            m = create_message_struct(fileFD, pid, child, 3);
+                            write_fifo(fifo1FD, &m);
                             semOp(semid, SYNC_FIFO1, 1);
 
                             // 2. FIFO2
                             // write on FIFO2 the 2nd part of the file of the size 1
                             printf("<Client_%d> writing on FIFO2...\n", pid);
-                            write_fifo(fifo2FD, fileFD, pid, child, 1);          
+                            m = create_message_struct(fileFD, pid, child, 1);
+                            write_fifo(fifo2FD, &m);
                             semOp(semid, SYNC_FIFO2, 1);
 
                             // 3. MSGQUEUE
+                            // send through MsgQueue the 3rd part of the file of the size 1
                             printf("<Client_%d> sending message through msgqueue...\n", pid);
-                            write_msgq(msqid, fileFD, pid, child, 1);
+                            mq = create_msgqueue_struct(fileFD, pid, child, 1);
+                            write_msgq(msqid, &mq);
+
+                            // 4. SHDMEM
+                            // write on shared memory the 4th part of the file of the size 1
+                            m = create_message_struct(fileFD, pid, child, 1);
+                            // get mutex on shared memory
+                            printf("<Client_%d> getting mutex on shared memory...\n", pid);
+                            semOp(semid, MUTEX_SHM, -1);
+                            printf("<Client_%d> writing on shared memory...\n", pid);
+                            write_shdm(&m, shmPtr, shmArr);
+                            // realease mutex
+                            printf("<Client_%d> releasing mutex...\n", pid);
+                            semOp(semid, SYNC_SHM, 1);
+                            semOp(semid, MUTEX_SHM, 1);
                             break;
                         case 9:
                             // 1. FIFO1
                             // write on FIFO1 the 1st part of the file of the size 3
                             printf("<Client_%d> writing on FIFO1...\n", pid);
-                            write_fifo(fifo1FD, fileFD, pid, child, 3);               
+                            m = create_message_struct(fileFD, pid, child, 3);
+                            write_fifo(fifo1FD, &m);
                             semOp(semid, SYNC_FIFO1, 1);
 
                             // 2. FIFO2
                             // write on FIFO2 the 2nd part of the file of the size 2
                             printf("<Client_%d> writing on FIFO2...\n", pid);
-                            write_fifo(fifo2FD, fileFD, pid, child, 2);          
+                            m = create_message_struct(fileFD, pid, child, 2);
+                            write_fifo(fifo2FD, &m);
                             semOp(semid, SYNC_FIFO2, 1);
 
                             // 3. MSGQUEUE
+                            // send through MsgQueue the 3rd part of the file of the size 2
                             printf("<Client_%d> sending message through msgqueue...\n", pid);
-                            write_msgq(msqid, fileFD, pid, child, 2);
+                            mq = create_msgqueue_struct(fileFD, pid, child, 2);
+                            write_msgq(msqid, &mq);
+
+                            // 4. SHDMEM
+                            // write on shared memory the 4th part of the file of the size 2
+                            m = create_message_struct(fileFD, pid, child, 2);
+                           // get mutex on shared memory
+                            printf("<Client_%d> getting mutex on shared memory...\n", pid);
+                            semOp(semid, MUTEX_SHM, -1);
+                            printf("<Client_%d> writing on shared memory...\n", pid);
+                            write_shdm(&m, shmPtr, shmArr);
+                            // realease mutex
+                            printf("<Client_%d> releasing mutex...\n", pid);
+                            semOp(semid, SYNC_SHM, 1);
+                            semOp(semid, MUTEX_SHM, 1);
                             break;
                         default:
                             // 1. FIFO1
                             // write on FIFO1 the 1st part of the file of the size 'size'
                             printf("<Client_%d> writing on FIFO1...\n", pid);
-                            write_fifo(fifo1FD, fileFD, pid, child, size);               
+                            m = create_message_struct(fileFD, pid, child, size);
+                            write_fifo(fifo1FD, &m);               
                             semOp(semid, SYNC_FIFO1, 1);
 
                             // 2. FIFO2
                             // write on FIFO2 the 2nd part of the file of the size 'size'
                             printf("<Client_%d> writing on FIFO2...\n", pid);
-                            write_fifo(fifo2FD, fileFD, pid, child, size);          
+                            m = create_message_struct(fileFD, pid, child, size);
+                            write_fifo(fifo2FD, &m);          
                             semOp(semid, SYNC_FIFO2, 1);
 
                             // 3. MSGQUEUE
+                            // send through MsgQueue the 3rd part of the file of the size 'size'
                             printf("<Client_%d> sending message through msgqueue...\n", pid);
-                            write_msgq(msqid, fileFD, pid, child, size);
+                            mq = create_msgqueue_struct(fileFD, pid, child, size);
+                            write_msgq(msqid, &mq);
+
+                            // 4. SHDMEM
+                            // write on shared memory the 4th part of the file of the size 'size'
+                            m = create_message_struct(fileFD, pid, child, size);
+                            // get mutex on shared memory
+                            printf("<Client_%d> getting mutex on shared memory...\n", pid);
+                            semOp(semid, MUTEX_SHM, -1);
+                            printf("<Client_%d> writing on shared memory...\n", pid);
+                            write_shdm(&m, shmPtr, shmArr);
+                            // realease mutex
+                            printf("<Client_%d> releasing mutex...\n", pid);
+                            semOp(semid, SYNC_SHM, 1);
+                            semOp(semid, MUTEX_SHM, 1);
                             break;
                     }
 
-                    // // 4. SHDMEM
-                    // message_struct part4;
-                    // part4.pid = pid;
-                    // strncpy(part4.path, g_files[child], NAME_MAX);
-                    // // read from file a chunk of size 'size'
-                    // read_from_file(fileFD, part4.content, size);
-                    // // get mutex on shared memory
-                    // // printf("<Client_%d> getting mutex on shared memory...\n", pid);
-                    // // semOp(semid, MUTEX_SHM, -1);
-                    // // write into the shared memory
-                    // // printf("<Client_%d> writing into the shared memory...\n", pid);
-                    // // write_shdm(shmPtr, &part4);
-                    // shmPtr[0] = part4;
-                    // // // // release mutex
-                    // // semOp(semid, MUTEX_SHM, 1);
-
                     // close file
                     printf("<Client_%d> closing the file %s...\n", pid, g_files[child]);
+                    close(fileFD);
                     close(fifo1FD);
                     close(fifo2FD);
-                    close(fileFD);
                     exit(0);
                 }
             }

@@ -20,6 +20,7 @@
 
 
 message_struct *shmPtr;
+short *shmArr;
 int shmid;
 int msqid;
 int semid;
@@ -36,11 +37,6 @@ void terminate_server() {
 
     close_fifo(fifo1FD, g_fifo1);
     close_fifo(fifo2FD, g_fifo2);
-
-    free(container_fifo1);
-    free(container_fifo2);
-    free(container_msgq);
-    free(container_shdm);
 
     exit(0);
 }
@@ -60,9 +56,15 @@ int main(int argc, char * argv[]) {
 
     printf("<Server> creating shared memory segment...\n");
     // allocate a SHARED MEMORY SEGMENT
-    shmid = alloc_shared_memory(g_shmKey, sizeof(message_struct) * MAX_MESSAGES_PER_IPC);
+    shmid = alloc_shared_memory(g_shmKey, 
+            sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
     shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
+    // attach an additional pointer to SHARED MEMORY SEGMENT
+    // to handle the SHARED MEMORY SEGMENT allocation
+    shmArr = (short *) attach_shared_memory(shmid, 0);
+    // move the pointer to where the array of "short" starts
+    shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
 
     // create a semaphore set with 5 semapaphore
     printf("<Server> creating semaphore set...\n");
@@ -78,7 +80,6 @@ int main(int argc, char * argv[]) {
         printf("<Server> waiting for the number of files...\n");
 
         // read the number of files from FIFO1
-        //sleep(3);
         fifo1FD = open_fifo(g_fifo1, O_RDONLY);
         int numFiles;
         int bR = read(fifo1FD, &numFiles, sizeof(numFiles));
@@ -100,39 +101,51 @@ int main(int argc, char * argv[]) {
         initialize_space_for_msg(numFiles);
         
         fifo2FD = open_fifo(g_fifo2, O_RDONLY);
+
         for (int i = 0; i < numFiles; i++) {
             semOp(semid, SYNC_FIFO1, -1);
             message_struct m1;
-            read_fifo(fifo1FD, &m1, sizeof(m1));
+            // printf("\n<Server> reading from fifo1...\n");
+            read_fifo(fifo1FD, &m1, sizeof(message_struct));
+            // printf("\n<Server> done\n");
             container_fifo1[i] = m1;
 
             printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
 
-            message_struct m2;
             semOp(semid, SYNC_FIFO2, -1);
-            read_fifo(fifo2FD, &m2, sizeof(m2));
+            message_struct m2;
+            // printf("\n<Server> reading from fifo2...\n");
+            read_fifo(fifo2FD, &m2, sizeof(message_struct));
+            // printf("\n<Server> done\n");
             container_fifo2[i] = m2;
 
             printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
 
             msgqueue_struct m3;
             size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+            // printf("\n<Server> receaving msg from msgq...\n");
             if (msgrcv(msqid, &m3, mSize, 1, 0) == -1) {
                 ErrExit("msgrcv failed");
             }
+            // printf("\n<Server> done\n");
             container_msgq[i] = m3;
 
             printf("[Parte 3, del file %s, spedita dal processo %d tramite MsgQueue]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
 
             message_struct m4;
-            // // read_shdm(&m4, shmPtr);
-            // m4 = shmPtr[0];
+            semOp(semid, SYNC_SHM, -1);
+            // printf("\n<Server> getting mutex on shared memory...\n");
+            semOp(semid, MUTEX_SHM, -1);
+            // printf("<Server> reading shared memory...\n");
+            read_shdm(shmPtr, &m4, shmArr);
+            // printf("<Server> releasing mutex...\n\n");
+            semOp(semid, MUTEX_SHM, 1);
             container_shdm[i] = m4;
 
-            // printf("[Parte 4, del file %s, spedita dal processo %d tramite ShdMem]\n%s\n", m4.path, m4.pid, m4.content);
+            printf("[Parte 4, del file %s, spedita dal processo %d tramite ShdMem]\n%s\n", m4.path, m4.pid, m4.content);
         }
 
-        // write_messages_to_files(numFiles);
+        write_messages_to_files(numFiles);
 
         printf("<Server> sending end message to client\n\n");
         msgqueue_struct end;
@@ -141,6 +154,11 @@ int main(int argc, char * argv[]) {
         if (msgsnd(msqid, &end, mSize, 0) == -1) {
             ErrExit("msgsnd failed");
         }
+
+        free(container_fifo1);
+        free(container_fifo2);
+        free(container_msgq);
+        free(container_shdm);
     }
 
     return 0;
