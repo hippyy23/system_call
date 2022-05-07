@@ -43,9 +43,9 @@ void terminate_server() {
 
 int main(int argc, char * argv[]) {
     // make FIFO1 and FIFO2
-    printf("<Server> creating FIFO1 %s...\n", g_fifo1);
+    // printf("<Server> creating FIFO1 %s...\n", g_fifo1);
     make_fifo(g_fifo1);
-    printf("<Server> creating FIFO2 %s...\n", g_fifo2);
+    // printf("<Server> creating FIFO2 %s...\n", g_fifo2);
     make_fifo(g_fifo2);
 
     // create a MESSAGE QUEUE
@@ -54,7 +54,7 @@ int main(int argc, char * argv[]) {
         ErrExit("msgget failed");
     }
 
-    printf("<Server> creating shared memory segment...\n");
+    // printf("<Server> creating shared memory segment...\n");
     // allocate a SHARED MEMORY SEGMENT
     shmid = alloc_shared_memory(g_shmKey, 
             sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
@@ -66,8 +66,8 @@ int main(int argc, char * argv[]) {
     // move the pointer to where the array of "short" starts
     shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
 
-    // create a semaphore set with 5 semapaphore
-    printf("<Server> creating semaphore set...\n");
+    // create a semaphore set with 8 semaphore
+    // printf("<Server> creating semaphore set...\n");
     semid = create_sem(g_semKey);
 
     // change signal handler for SIGINT
@@ -76,16 +76,16 @@ int main(int argc, char * argv[]) {
     }
 
     while (1) {
-        // open FIFO1 in read-only
         printf("<Server> waiting for the number of files...\n");
 
-        // read the number of files from FIFO1
+        // open FIFO1 in read-only
         fifo1FD = open_fifo(g_fifo1, O_RDONLY);
         int numFiles;
-        int bR = read(fifo1FD, &numFiles, sizeof(numFiles));
+        // read the number of files from FIFO1
+        int bR = read(fifo1FD, &numFiles, sizeof(int));
         if (bR == -1) {
             printf("<Server> FIFO is broken\n");
-        } else if (bR != sizeof(numFiles) || bR == 0) {
+        } else if (bR != sizeof(int) || bR == 0) {
             printf("<Server> did not recieved the number of files\n");
         } else {
             printf("<Server> number of files to be recieved %d\n", numFiles);
@@ -93,7 +93,6 @@ int main(int argc, char * argv[]) {
 
         // initialize the semaphore
         initialize_sem(semid, numFiles);
-
         // write init signal '*' to client through shared memory
         printf("<Server> writing start signal to client\n");
         shmPtr[0].pid = -23;
@@ -103,49 +102,49 @@ int main(int argc, char * argv[]) {
         fifo2FD = open_fifo(g_fifo2, O_RDONLY);
 
         for (int i = 0; i < numFiles; i++) {
-            semOp(semid, SYNC_FIFO1, -1);
             message_struct m1;
-            // printf("\n<Server> reading from fifo1...\n");
-            read_fifo(fifo1FD, &m1, sizeof(message_struct));
-            // printf("\n<Server> done\n");
+            read_fifo(fifo1FD, &m1);
+            semOp(semid, LIMIT_FIFO1, 1, 0);
             container_fifo1[i] = m1;
 
             printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
 
-            semOp(semid, SYNC_FIFO2, -1);
             message_struct m2;
-            // printf("\n<Server> reading from fifo2...\n");
-            read_fifo(fifo2FD, &m2, sizeof(message_struct));
-            // printf("\n<Server> done\n");
+            read_fifo(fifo2FD, &m2);
+            semOp(semid, LIMIT_FIFO2, 1, 0);
             container_fifo2[i] = m2;
 
             printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
 
             msgqueue_struct m3;
             size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
-            // printf("\n<Server> receaving msg from msgq...\n");
             if (msgrcv(msqid, &m3, mSize, 1, 0) == -1) {
                 ErrExit("msgrcv failed");
             }
-            // printf("\n<Server> done\n");
+            semOp(semid, LIMIT_MSGQ, 1, 0);
             container_msgq[i] = m3;
 
             printf("[Parte 3, del file %s, spedita dal processo %d tramite MsgQueue]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
 
+            semOp(semid, SYNC_SHM, -1, 0);
             message_struct m4;
-            semOp(semid, SYNC_SHM, -1);
             // printf("\n<Server> getting mutex on shared memory...\n");
-            semOp(semid, MUTEX_SHM, -1);
+            semOp(semid, MUTEX_SHM, -1, 0);
             // printf("<Server> reading shared memory...\n");
             read_shdm(shmPtr, &m4, shmArr);
             // printf("<Server> releasing mutex...\n\n");
-            semOp(semid, MUTEX_SHM, 1);
+            semOp(semid, MUTEX_SHM, 1, 0);
             container_shdm[i] = m4;
 
             printf("[Parte 4, del file %s, spedita dal processo %d tramite ShdMem]\n%s\n", m4.path, m4.pid, m4.content);
         }
-
+        close(fifo1FD);
+        close(fifo2FD);
         write_messages_to_files(numFiles);
+        free(container_fifo1);
+        free(container_fifo2);
+        free(container_msgq);
+        free(container_shdm);
 
         printf("<Server> sending end message to client\n\n");
         msgqueue_struct end;
@@ -154,11 +153,7 @@ int main(int argc, char * argv[]) {
         if (msgsnd(msqid, &end, mSize, 0) == -1) {
             ErrExit("msgsnd failed");
         }
-
-        free(container_fifo1);
-        free(container_fifo2);
-        free(container_msgq);
-        free(container_shdm);
+        sleep(2);
     }
 
     return 0;

@@ -12,11 +12,14 @@
 #define MAX_PAGE_SIZE 1024
 #define MAX_MESSAGES_PER_IPC 50
 
-#define SYNC_SHM 0
-#define WAIT_CHILD 1
-#define MUTEX_SHM 2
-#define SYNC_FIFO1 3
-#define SYNC_FIFO2 4
+#define WAIT_CHILD 0
+#define MUTEX_SHM 1
+#define LIMIT_FIFO1 2
+#define LIMIT_FIFO2 3
+#define LIMIT_MSGQ 4
+#define SYNC_SHM 5
+#define SYNC_FIFO1 6
+#define SYNC_FIFO2 7
 
 
 typedef struct message {

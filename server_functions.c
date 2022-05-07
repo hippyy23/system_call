@@ -40,7 +40,7 @@ void write_messages_to_files(int numFiles) {
         // create new file
         strcpy(newPath, container_fifo1[index].path);
         strcat(newPath, "_out");
-        printf("<Server> creating file %s...\n", newPath);
+        // printf("<Server> creating file %s...\n", newPath);
         fd = open_file(newPath);
 
         write_to_file(fd, &container_fifo1[index], 1, mode[0]);
@@ -111,22 +111,20 @@ void write_to_file_msgq(int fd, msgqueue_struct *m, int section, char mode[]) {
     }
 }
 
-void read_fifo(int fd, message_struct *m, int size) {
-    if (read(fd, m, size) == -1) {
+void read_fifo(int fd, message_struct *m) {
+    if (read(fd, m, sizeof(message_struct)) == -1) {
         ErrExit("read failed");
     }
 }
 
 void read_shdm(message_struct *src, message_struct *dest, short *shmArr) {
-    int index = 0;
-    while (shmArr[index] == 0) {
-        index++;
-        if (index == MAX_MESSAGES_PER_IPC) {
-            index = 0;
+    for (int index = 0; index < MAX_MESSAGES_PER_IPC; index++) {
+        if (shmArr[index] == 1) {
+            *dest = src[index];
+            shmArr[index] = 0;
+            return;
         }
     }
-    *dest = src[index];
-    shmArr[index] = 0;
 }
 
 void remove_msgq(int msqid) {

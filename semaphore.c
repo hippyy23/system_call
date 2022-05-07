@@ -3,6 +3,7 @@
 ///         specifiche per la gestione dei SEMAFORI.
 
 #include <stdio.h>
+#include <errno.h>
 
 #include <sys/stat.h>
 #include <sys/sem.h>
@@ -12,8 +13,8 @@
 
 
 int create_sem(key_t semKey) {
-    // create a semaphore set with 5 semaphore
-    int semid = semget(semKey, 5, IPC_CREAT | S_IRUSR | S_IWUSR);
+    // create a semaphore set with 6 semaphore
+    int semid = semget(semKey, 6, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (semid == -1) {
         ErrExit("semget failed");
     }
@@ -24,7 +25,7 @@ int create_sem(key_t semKey) {
 void initialize_sem(int semid, int num_child) {
     // initialize the semaphore set
     union semun arg;
-    unsigned short values[] = {0, num_child, 1, 0, 0};
+    unsigned short values[] = {num_child, 1, 50, 50, 50, 0};
     arg.array = values;
 
     if (semctl(semid, 0, SETALL, arg) == -1) {
@@ -40,10 +41,17 @@ void remove_sem(int semid) {
     }
 }
 
-void semOp(int semid, unsigned short sem_num, short sem_op) {
-    struct sembuf sop = {.sem_num = sem_num, .sem_op = sem_op, .sem_flg = 0};
-
+int semOp(int semid, unsigned short sem_num, short sem_op, short sem_flg) {
+    struct sembuf sop = {.sem_num = sem_num, .sem_op = sem_op, .sem_flg = sem_flg};
+    errno = 0;
+    
     if (semop(semid, &sop, 1) == -1) {
-        ErrExit("semop failed");
+        if (errno == EAGAIN) {
+            return -1;
+        } else {
+            ErrExit("semop failed");
+        }
     }
+    
+    return 0;
 }

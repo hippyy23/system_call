@@ -63,7 +63,8 @@ char * get_username() {
     }
 }
 
-void search(int pos) {
+void search() {
+    static int pos = 0;
     DIR *dirp = opendir(g_wd);
     if (dirp == NULL) {
         ErrExit("open dir failed");
@@ -71,7 +72,6 @@ void search(int pos) {
 
     errno = 0;
     struct dirent *dentry;
-
     while ((dentry = readdir(dirp)) != NULL) {
         if (strcmp(dentry->d_name, ".") == 0 || strcmp(dentry->d_name, "..") == 0) {
             continue;
@@ -79,23 +79,19 @@ void search(int pos) {
 
         if (dentry->d_type == DT_REG) {
             size_t lastPath = append_path(dentry->d_name);
-
+            
             if (check_file_name(dentry->d_name, "sendme_") && check_file_size(g_wd, MAX_FILE_SIZE)) {
                 strncpy(g_files[pos], g_wd, NAME_MAX);
-                // TO BE REMOVED
-                //printf("%s\n", g_files[pos]);
-                //printf("%s\n", g_wd);
-                pos++;
-                
+                pos++;                
                 if (pos > MAX_FILES) {
                     ErrExit("too many files: check MAX_FILES");
                 }
-            }
-            
+            }            
             g_wd[lastPath] = '\0';
+
         } else if (dentry->d_type == DT_DIR) {
             size_t lastPath = append_path(dentry->d_name);
-            search(pos);
+            search();
             g_wd[lastPath] = '\0';
         }
         errno = 0;
@@ -106,6 +102,8 @@ void search(int pos) {
     if (closedir(dirp) == -1) {
         ErrExit("closedir failed");
     }
+    strcpy(g_files[pos], "");
+    pos = 0;
 }
 
 size_t append_path(char *dir) {
@@ -124,7 +122,6 @@ int check_file_size(char *pathname, off_t size) {
     if (pathname == NULL) {
         return 0;
     }
-
     struct stat statbuf;
     if (stat(pathname, &statbuf) == -1) {
         return 0;
@@ -135,7 +132,6 @@ int check_file_size(char *pathname, off_t size) {
 
 int get_num_files() {
     int n = 0;
-
     for (int i = 0; strcmp(g_files[i], "") != 0; i++) {
         n++;
     }
@@ -147,7 +143,6 @@ int check_num_chars_in_file(int fd) {
     int count = 0;
     ssize_t bR;
     char buffer;
-
     do {
         bR = read(fd, &buffer, sizeof(char));
         if (bR == -1) {
@@ -168,25 +163,33 @@ void write_fifo(int fifoFD, message_struct *m) {
     }
 }
 
-void write_msgq(int msqid, msgqueue_struct *m) {
+int write_msgq(int msqid, msgqueue_struct *m) {
     // send the message to the server
     size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
-    if (msgsnd(msqid, m, mSize, 0) == -1) {
-        ErrExit("msgsnd failed");
-    }
-}
-
-void write_shdm(message_struct *src, message_struct *dest, short *shmArr) {
-    // write the message on shared memory
-    int index = 0;
-    while (shmArr[index] == 1) {
-        index++;
-        if (index == MAX_MESSAGES_PER_IPC) {
-            index = 0;
+    errno = 0;
+    if (msgsnd(msqid, m, mSize, IPC_NOWAIT) == -1) {
+        if (errno == EAGAIN) {
+            printf("Messaggio non mandato %s\n", m->mtext.path);
+            return -1;
+        } else {
+            ErrExit("msgsnd failed");
         }
     }
-    dest[index] = *src;
-    shmArr[index] = 1;
+
+    return 0;
+}
+
+int write_shdm(message_struct *src, message_struct *dest, short *shmArr) {
+    // write the message on shared memory
+    for (int index = 0; index < MAX_MESSAGES_PER_IPC; index++) {
+        if (shmArr[index] == 0) {
+            dest[index] = *src;
+            shmArr[index] = 1;
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 void read_from_file(int fd, char *buffer, int size) {
@@ -194,7 +197,6 @@ void read_from_file(int fd, char *buffer, int size) {
     if (n == -1) {
         ErrExit("read failed");
     }
-    printf("Bytes read: %d\n", n);
     buffer[n] = '\0';
 }
 
@@ -205,20 +207,21 @@ message_struct create_message_struct(int fileFD, int pid, int index, int size) {
     m.pid = pid;
     // write the path into the message
     strncpy(m.path, g_files[index], NAME_MAX);
-    // read from file a chunk of size 'size'
+    // read from file a chunk of size 'size' and write it into the message
     read_from_file(fileFD, m.content, size);
 
     return m;
 }
 
 msgqueue_struct create_msgqueue_struct(int fileFD, int pid, int index, int size) {
-     // initialize the struct of the message
+    // initialize the struct of the message
     msgqueue_struct m;
     m.mtype = 1;
     // write the pid into the message
     m.mtext.pid = pid;
+    // write the path into the message
     strncpy(m.mtext.path, g_files[index], NAME_MAX);
-    // read from file a chunk of size 'size'
+    // read from file a chunk of size 'size' and write it into the message
     read_from_file(fileFD, m.mtext.content, size);
 
     return m;
