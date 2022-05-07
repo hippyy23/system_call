@@ -14,7 +14,7 @@
 
 int create_sem(key_t semKey) {
     // create a semaphore set with 6 semaphore
-    int semid = semget(semKey, 6, IPC_CREAT | S_IRUSR | S_IWUSR);
+    int semid = semget(semKey, 7, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (semid == -1) {
         ErrExit("semget failed");
     }
@@ -25,7 +25,7 @@ int create_sem(key_t semKey) {
 void initialize_sem(int semid, int num_child) {
     // initialize the semaphore set
     union semun arg;
-    unsigned short values[] = {num_child, 1, 50, 50, 50, 0};
+    unsigned short values[] = {num_child, 1, 50, 50, 50, 0, 0};
     arg.array = values;
 
     if (semctl(semid, 0, SETALL, arg) == -1) {

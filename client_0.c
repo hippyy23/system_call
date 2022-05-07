@@ -92,7 +92,7 @@ int main(int argc, char * argv[]) {
 
         // get the semaphore set
         printf("<Client_0> getting server's semaphore set...\n");
-        semid = semget(g_semKey, 6, 0);
+        semid = semget(g_semKey, 7, 0);
         fifo2FD = open_fifo(g_fifo2, O_WRONLY);
         if (semid != -1) {
             // wait for response from server on shared memory segment
@@ -261,6 +261,7 @@ int main(int argc, char * argv[]) {
                 ErrExit("msgrcv failed");
             }
             printf("<Client_0> recieved end message from the server\n\n");
+            semOp(semid, END, 1, 0);
 
             unlock_signals();
 

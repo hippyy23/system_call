@@ -153,7 +153,7 @@ int main(int argc, char * argv[]) {
         if (msgsnd(msqid, &end, mSize, 0) == -1) {
             ErrExit("msgsnd failed");
         }
-        sleep(2);
+        semOp(semid, END, -1, 0);
     }
 
     return 0;

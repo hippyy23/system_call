@@ -18,8 +18,7 @@
 #define LIMIT_FIFO2 3
 #define LIMIT_MSGQ 4
 #define SYNC_SHM 5
-#define SYNC_FIFO1 6
-#define SYNC_FIFO2 7
+#define END 6
 
 
 typedef struct message {
