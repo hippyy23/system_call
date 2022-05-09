@@ -37,4 +37,4 @@ based on the part of the file, **FILENAME** is the name of the source file inclu
 - when it has received and saved all the files it sends a termination message to the
 **MsgQueue ** so that it can be recognised by **Client_0** as a job completion message.
 - waits again on **FIFO1** for a new value
-- Upon arrival of the SIGINT command (Ctrl-C from terminal) the Server process removes all IPCs and terminates.
+- Upon arrival of the **SIGINT** command (Ctrl-C from terminal) the Server process removes all IPCs and terminates.
