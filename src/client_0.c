@@ -267,11 +267,8 @@ int main(int argc, char * argv[]) {
 
             printf("<Client_0> waiting for end message from the server...\n");
             msgqueue_struct end;
-            size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
             // wait for the END message from server
-            if (msgrcv(msqid, &end, mSize, 1337, 0) == -1) {
-                ErrExit("msgrcv failed");
-            }
+            read_msgq(msqid, &end, 1337, 0);
             printf("<Client_0> recieved end message from the server\n\n");
             semOp(semid, END, 1, 0);
 
