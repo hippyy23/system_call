@@ -1,8 +1,8 @@
 CFLAGS   = -Wall -std=gnu99
 INCLUDES = -I./inc
 
-CLIENT_SRCS = src/defines.c src/err_exit.c src/shared_memory.c src/semaphore.c src/fifo.c src/client_0.c src/client_functions.c
-SERVER_SRCS = src/defines.c src/err_exit.c src/shared_memory.c src/semaphore.c src/fifo.c src/server.c src/server_functions.c
+CLIENT_SRCS = src/defines.c src/err_exit.c src/shared_memory.c src/semaphore.c src/fifo.c src/client_0.c src/client_functions.c src/message_queue.c
+SERVER_SRCS = src/defines.c src/err_exit.c src/shared_memory.c src/semaphore.c src/fifo.c src/server.c src/server_functions.c src/message_queue.c
 
 SERVER_OBJS = $(SERVER_SRCS:.c=.o)
 CLIENT_OBJS = $(CLIENT_SRCS:.c=.o)
@@ -19,7 +19,7 @@ server: $(SERVER_OBJS)
 
 .c.o:
 	@echo "Compiling: "$<
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) -g -c $< -o $@
 
 clean:
 	@rm -vf ${CLIENT_OBJS}
