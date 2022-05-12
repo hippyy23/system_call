@@ -48,8 +48,7 @@ void write_messages_to_files(int numFiles) {
         // get pid
         pid = container_fifo1[index].pid;
         // create new file
-        strcpy(newPath, container_fifo1[index].path);
-        strcat(newPath, "_out");
+        set_file_out_name(container_fifo1[index].path, newPath);
         // printf("<Server> creating file %s...\n", newPath);
         fd = create_file(newPath);
 
@@ -75,7 +74,7 @@ void write_messages_to_files(int numFiles) {
  * @return int 
  */
 int create_file(char *path) {
-    int fd = open(path, O_WRONLY | O_APPEND | O_CREAT, S_IWUSR | S_IRUSR);
+    int fd = open(path, O_WRONLY | O_TRUNC | O_CREAT, S_IWUSR | S_IRUSR);
     if (fd == -1) {
         ErrExit("open failed");
     }
@@ -84,7 +83,32 @@ int create_file(char *path) {
 }
 
 /**
- * @brief Get the index of the message based on the PID
+ * @brief Set the file name for output files
+ *        by adding _out to the end of the filename
+ *        (the extension of the file is considered)
+ * 
+ * @param oldPath char*
+ * @param newPath char*
+ */
+void set_file_out_name(char *oldPath, char *newPath) {
+    // copy in a temp var the path to split
+    char temp[PATH_SIZE];
+    strcpy(temp, oldPath);
+
+    // get path w/o file extension
+    char *path = strtok(temp, ".");
+    // get file extension
+    char *extension = strtok(NULL, ".");
+    // check if file has extension
+    if (extension == NULL) {
+        snprintf(newPath, PATH_SIZE, "%s_out", path);
+    } else {
+        snprintf(newPath, PATH_SIZE, "%s_out.%s", path, extension);
+    }
+}
+
+/**
+ * @brief Get the index of the message based on PID
  * 
  * @param container msgqueue_struct*
  * @param pid int

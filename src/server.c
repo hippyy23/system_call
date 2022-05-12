@@ -20,14 +20,6 @@
 #include "server_functions.h"
 
 
-message_struct *shmPtr;
-short *shmArr;
-int shmid;
-int msqid;
-int semid;
-int fifo1FD;
-int fifo2FD;
-
 void terminate_server() {
     remove_msgq(msqid);
 
@@ -49,12 +41,21 @@ int main(int argc, char * argv[]) {
     // printf("<Server> creating FIFO2 %s...\n", g_fifo2);
     make_fifo(g_fifo2);
 
+    // create keys for IPCs
+    key_t keyMsq = ftok(g_fifo1, 'a');
+    key_t keyShm = ftok(g_fifo1, 'b');
+    key_t keySem = ftok(g_fifo1, 'c');
+    // check if keys have been created
+    if (keyMsq == -1 || keyShm == -1 || keySem == -1) {
+        ErrExit("ftok failed");
+    }
+
     // create a MESSAGE QUEUE
-    msqid = create_msgq(g_msgKey, IPC_CREAT | S_IRUSR | S_IWUSR);
+    msqid = create_msgq(keyMsq, IPC_CREAT | S_IRUSR | S_IWUSR);
 
     // printf("<Server> creating shared memory segment...\n");
     // allocate a SHARED MEMORY SEGMENT
-    shmid = alloc_shared_memory(g_shmKey, 
+    shmid = alloc_shared_memory(keyShm, 
             sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
     shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
@@ -66,7 +67,7 @@ int main(int argc, char * argv[]) {
 
     // create a semaphore set with 8 semaphore
     // printf("<Server> creating semaphore set...\n");
-    semid = create_sem(g_semKey);
+    semid = create_sem(keySem);
 
     // change signal handler for SIGINT
     if (signal(SIGINT, terminate_server) == SIG_ERR) {

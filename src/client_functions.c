@@ -87,8 +87,8 @@ char * get_username() {
 /**
  * @brief Search for files that start with "sendme_" in the cwd and all sub-directories
  */
-void search() {
-    static int pos = 0;
+void search(int *pos) {
+    //static int pos = 0;
     DIR *dirp = opendir(g_wd);
     if (dirp == NULL) {
         ErrExit("open dir failed");
@@ -105,10 +105,10 @@ void search() {
             size_t lastPath = append_path(dentry->d_name);
             
             if (check_file_name(dentry->d_name, "sendme_") && check_file_size(g_wd, MAX_FILE_SIZE)) {
-                strncpy(g_files[pos], g_wd, PATH_SIZE);
-                pos++;                
-                if (pos > MAX_FILES) {
-                    printf("too many files: check MAX_FILES");
+                strncpy(g_files[*pos], g_wd, PATH_SIZE);
+                (*pos)++;
+                if (*pos > MAX_FILES) {
+                    printf("too many files: check MAX_FILES\n");
                     exit(0);
                 }
             }            
@@ -116,7 +116,7 @@ void search() {
 
         } else if (dentry->d_type == DT_DIR) {
             size_t lastPath = append_path(dentry->d_name);
-            search();
+            search(pos);
             g_wd[lastPath] = '\0';
         }
         errno = 0;
@@ -127,8 +127,6 @@ void search() {
     if (closedir(dirp) == -1) {
         ErrExit("closedir failed");
     }
-    strcpy(g_files[pos], "");
-    pos = 0;
 }
 
 size_t append_path(char *dir) {
@@ -148,7 +146,7 @@ size_t append_path(char *dir) {
  */
 int check_file_name(char *filename, char *str) {
     return (filename == NULL || str == NULL) ?
-        0 : strncmp(filename, str, 7) == 0;
+        0 : strncmp(filename, str, 7) == 0 && strstr(filename, "_out") == NULL;
 }
 
 /**
@@ -167,8 +165,9 @@ int check_file_size(char *pathname, off_t size) {
     if (stat(pathname, &statbuf) == -1) {
         return 0;
     }
+    int fileSize = statbuf.st_size;
 
-    return statbuf.st_size <= size;
+    return fileSize <= size && fileSize >= 4;
 }
 
 /**

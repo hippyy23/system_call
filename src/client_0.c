@@ -28,7 +28,6 @@
 
 
 int main(int argc, char * argv[]) {
-    int numFiles;
     int fifo1FD, fifo2FD;
     int semid, shmid, msqid;
     short *shmArr;
@@ -62,25 +61,39 @@ int main(int argc, char * argv[]) {
         block_all_signals();
 
         // search for all files whose name starts with "send_"
-        search();
+        int *numFiles = malloc(sizeof(int));
+        *numFiles = 0;
+        search(numFiles);
         // get the number of files found
-        numFiles = get_num_files(g_files);
-        printf("<Client_0> number of files found %d\n", numFiles);
+        if (*numFiles == 0) {
+            printf("ERROR: Files found %d!\n", *numFiles);
+            exit(0);
+        }
+        printf("<Client_0> number of files found %d\n", *numFiles);
 
         // send the number of files to the server through fifo1
         printf("<Client_0> opening fifo1 %s\n", g_fifo1);
         fifo1FD = open_fifo(g_fifo1, O_WRONLY);
 
-        if (write(fifo1FD, &numFiles, sizeof(int)) != sizeof(int)) {
+        if (write(fifo1FD, numFiles, sizeof(int)) != sizeof(int)) {
             ErrExit("write failed");
         }
 
+        // create keys for IPCs
+        key_t keyMsq = ftok(g_fifo1, 'a');
+        key_t keyShm = ftok(g_fifo1, 'b');
+        key_t keySem = ftok(g_fifo1, 'c');
+        // check if keys have been created
+        if (keyMsq == -1 || keyShm == -1 || keySem == -1) {
+            ErrExit("ftok failed");
+        }
+
         // get the server msqid
-        msqid = create_msgq(g_msgKey, 0);
+        msqid = create_msgq(keyMsq, 0);
 
         printf("<Client_0> getting server's shared memory segment...\n");
         // get the server's shared memory segment
-        shmid = alloc_shared_memory(g_shmKey, 
+        shmid = alloc_shared_memory(keyShm, 
                     sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
         // attach the SHARED MEMORY SEGMENT in read/write mode
         message_struct *shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
@@ -92,14 +105,14 @@ int main(int argc, char * argv[]) {
 
         // get the semaphore set
         printf("<Client_0> getting server's semaphore set...\n");
-        semid = semget(g_semKey, 7, 0);
+        semid = semget(keySem, 7, 0);
         fifo2FD = open_fifo(g_fifo2, O_WRONLY);
         if (semid != -1) {
             // wait for response from server on shared memory segment
             while (shmPtr[0].pid != -23);
 
             printf("<Client_0> recieved start signal from server\n");
-            for (int child = 0; child < numFiles; child++) {
+            for (int child = 0; child < *numFiles; child++) {
                 pid_t pid = fork();
                 message_struct mFifo1;
                 mFifo1.pid = 0;
@@ -264,6 +277,7 @@ int main(int argc, char * argv[]) {
             // close fifo
             close(fifo1FD);
             close(fifo2FD);
+            free(numFiles);
 
             printf("<Client_0> waiting for end message from the server...\n");
             msgqueue_struct end;
@@ -278,6 +292,5 @@ int main(int argc, char * argv[]) {
             ErrExit("semget failed");
         }
     }
-    printf("<Client_0> quitting...\n");
     return 0;
 }
