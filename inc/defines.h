@@ -22,6 +22,8 @@
 #define END 6
 
 
+// STRUCT DEFINITION
+
 typedef struct message {
     char content[MAX_PAGE_SIZE];
     int pid;
@@ -33,10 +35,8 @@ typedef struct msgqueue {
     struct message mtext;
 } msgqueue_struct;
 
+
 // GLOBAL VARIABLES
 
 char *g_fifo1;
 char *g_fifo2;
-int g_msgKey;
-int g_shmKey;
-int g_semKey;
