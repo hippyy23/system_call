@@ -2,7 +2,7 @@
 # GENERALE DESCRIPTION
 
 ## Process Client_0
-When **Client_0 process** is started (with the command `./client_0 <HOME>/myDir/`, where <HOME> is the user's home directory, i.e. the value contained in the environment variable HOME), creates a mask that allows it to receive only SIGINT and SIGUSR1 signals and waits for one of these signals.
+When **Client_0 process** is started (with the command `./client_0 <HOME>/myDir/`, where '<HOME>' is the user's home directory, i.e. the value contained in the environment variable HOME), creates a mask that allows it to receive only SIGINT and SIGUSR1 signals and waits for one of these signals.
  - When the **SIGUSR1** signal is received, the Client_0 process terminates.
  - When the **SIGINT** signal is received (Ctrl-C from the keyboard), the Client_0 process:
 	 - sets its current directory to a path passed from the command line at program startup program 		startup,
