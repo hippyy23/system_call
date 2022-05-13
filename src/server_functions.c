@@ -45,22 +45,27 @@ void write_messages_to_files(int numFiles) {
     char mode[][9] = {"FIFO1", "FIFO2", "MsgQueue", "ShdMem"};
 
     for (int index = 0; index < numFiles; index++) {
-        // get pid
+        // get PID of the message from FIFO1
         pid = container_fifo1[index].pid;
-        // create new file
         set_file_out_name(container_fifo1[index].path, newPath);
-        // printf("<Server> creating file %s...\n", newPath);
+        // create new file
         fd = create_file(newPath);
-
+        // write to file content from FIFO1
         write_to_file(fd, &container_fifo1[index], 1, mode[0]);
 
+        // get the message index that matches the PID
         f2Index = get_index(container_fifo2, pid, numFiles);
+        // write to file content from FIFO2
         write_to_file(fd, &container_fifo2[f2Index], 2, mode[1]);
 
+        // get the message index that matches the PID
         msgqIndex = get_index_msgq(container_msgq, pid, numFiles);
+        // write to file content from MsgQueue
         write_to_file_msgq(fd, &container_msgq[msgqIndex], 3, mode[2]);
 
+        // get the message index that matches the PID
         shdmIndex = get_index(container_shdm, pid, numFiles);
+        // write to file content from ShdMem
         write_to_file(fd, &container_shdm[shdmIndex], 4, mode[3]);
 
         close(fd);
@@ -99,7 +104,7 @@ void set_file_out_name(char *oldPath, char *newPath) {
     char *path = strtok(temp, ".");
     // get file extension
     char *extension = strtok(NULL, ".");
-    // check if file has extension
+    // check if file has an extension
     if (extension == NULL) {
         snprintf(newPath, PATH_SIZE, "%s_out", path);
     } else {
@@ -108,7 +113,7 @@ void set_file_out_name(char *oldPath, char *newPath) {
 }
 
 /**
- * @brief Get the index of the message based on PID
+ * @brief Get the message index that matches the PID from a container
  * 
  * @param container msgqueue_struct*
  * @param pid int
@@ -126,7 +131,7 @@ int get_index(message_struct *container, int pid, int size) {
 }
 
 /**
- * @brief Get the index of the message based on the PID
+ * @brief Get the message index that matches the PID from msq container
  * 
  * @param container msgqueue_struct*
  * @param pid int
@@ -139,7 +144,7 @@ int get_index_msgq(msgqueue_struct *container, int pid, int size) {
             return index;
         }
     }
-    printf("Index not found!!!\n");
+
     return -1;
 }
 
@@ -156,8 +161,6 @@ void write_to_file(int fd, message_struct *m, int section, char *mode) {
 
     int n = sprintf(buffer, "[Parte %d, del file %s, spedita dal processo %d tramite %s]\n%s%s",
             section, m->path, m->pid, mode, m->content, section == 4 ? "\n" : "\n\n");
-    //buffer[n] = '\0';
-    //printf("%s\n", buffer);
     int bR = write(fd, buffer, n);
     if (bR == -1) {
         ErrExit("write failed");
@@ -182,4 +185,3 @@ void write_to_file_msgq(int fd, msgqueue_struct *m, int section, char *mode) {
         ErrExit("write failed");
     }
 }
-

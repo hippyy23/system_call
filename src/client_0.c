@@ -50,9 +50,10 @@ int main(int argc, char * argv[]) {
 
     // if SIGUSR1 is recieved client_0 finishes
     // if SIGINT is recieved client_0 starts
-    if (signal(SIGUSR1, terminate_client0) == SIG_ERR ||
-        signal(SIGINT, start_client0) == SIG_ERR)
+    if (signal(SIGUSR1, terminate_client0) == SIG_ERR || 
+        signal(SIGINT, start_client0) == SIG_ERR) {
         ErrExit("change signal handler failed");
+    }
 
     while (1) {
         // wait for a signal to be recieved
@@ -64,7 +65,6 @@ int main(int argc, char * argv[]) {
         int *numFiles = malloc(sizeof(int));
         *numFiles = 0;
         search(numFiles);
-        // get the number of files found
         if (*numFiles == 0) {
             printf("ERROR: Files found %d!\n", *numFiles);
             exit(0);
@@ -74,7 +74,6 @@ int main(int argc, char * argv[]) {
         // send the number of files to the server through fifo1
         printf("<Client_0> opening fifo1 %s\n", g_fifo1);
         fifo1FD = open_fifo(g_fifo1, O_WRONLY);
-
         if (write(fifo1FD, numFiles, sizeof(int)) != sizeof(int)) {
             ErrExit("write failed");
         }
@@ -91,8 +90,8 @@ int main(int argc, char * argv[]) {
         // get the server msqid
         msqid = create_msgq(keyMsq, 0);
 
-        printf("<Client_0> getting server's shared memory segment...\n");
         // get the server's shared memory segment
+        printf("<Client_0> getting server's shared memory segment...\n");
         shmid = alloc_shared_memory(keyShm, 
                     sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
         // attach the SHARED MEMORY SEGMENT in read/write mode
@@ -105,15 +104,21 @@ int main(int argc, char * argv[]) {
 
         // get the semaphore set
         printf("<Client_0> getting server's semaphore set...\n");
-        semid = semget(keySem, 7, 0);
+        semid = semget(keySem, 6, 0);
+
+        // open FIFO2
+        printf("<Client_0> opening fifo2 %s\n", g_fifo2);
         fifo2FD = open_fifo(g_fifo2, O_WRONLY);
+
         if (semid != -1) {
             // wait for response from server on shared memory segment
+            printf("<Client_0> waiting for start signal from server\n");
             while (shmPtr[0].pid != -23);
 
-            printf("<Client_0> recieved start signal from server\n");
+            printf("<Client_0> start signal recieved, sending messages...\n");
             for (int child = 0; child < *numFiles; child++) {
                 pid_t pid = fork();
+                // initialize empty structs
                 message_struct mFifo1;
                 mFifo1.pid = 0;
                 message_struct mFifo2;
@@ -130,6 +135,7 @@ int main(int argc, char * argv[]) {
                 } else if (pid == 0) {
                     // code executed only by the child
                     pid_t pid = getpid();
+
                     // OPEN FILE
                     // printf("<Client_%d> opening file %s\n", pid, g_files[child]);
                     int fileFD = open(g_files[child], O_RDONLY, S_IRUSR);
@@ -140,16 +146,16 @@ int main(int argc, char * argv[]) {
                     // CHECK THE NUMBER OF CHARS
                     int numChars = check_num_chars_in_file(fileFD);
                     if (numChars < 4) {
-                        printf("ERROR: number of chars less then 4");
+                        printf("ERROR: number of chars less then 4\n");
                     }
                     // printf("<Client_%d> number of chars found %d\n", pid, numChars);
 
                     // GET THE SIZE OF EACH PART
-                    // we have problems with numChars less then 10 -> (5, 6, 9)
+                    // problems with numChars less then 10 -> (5, 6, 9)
                     // if 5 - FIFO1: 2 FIFO2: 1 Msgq: 1 Shm: 1
                     // if 6 - FIFO1: 3 FIFO2: 1 Msgq: 1 Shm: 1
                     // if 9 - FIFO1: 3 FIFO2: 2 Msgq: 2 Shm: 2
-                    // for the rest use ceil(numChars / 4)
+                    // otherwise use ceil(numChars / 4)
                     int size = ceil(((float) numChars) / 4);
                     switch (numChars) {
                         case 5:
@@ -177,17 +183,18 @@ int main(int argc, char * argv[]) {
                             sizeShm = size;
                             break;
                     }
+
                     // BLOCK ALL CHILDREN UNTIL EVERYONE HAS REACHED THIS POINT
                     semOp(semid, WAIT_CHILD, -1, 0);
                     semOp(semid, WAIT_CHILD, 0, 0);
 
-                    // SEND EACH PART THROUGH IPCS
+                    // flags which indicate if a message was sent to a particular IPC
                     bool sentFifo1 = false;
                     bool sentFifo2 = false;
                     bool sentMsgq = false;
                     bool sentShm = false;
-                    // flag to check if the function semOp failed with errno equal to EAGAIN
-                    int res = 0;
+
+                    // send each part
                     do {
                         // 1. FIFO1
                         // write on FIFO1 the 1st part of the file
@@ -198,8 +205,7 @@ int main(int argc, char * argv[]) {
                         }
                         // check whether the message has been sent
                         if (!sentFifo1) {
-                            res = semOp(semid, LIMIT_FIFO1, -1, IPC_NOWAIT);
-                            if (res == 0) {
+                            if (semOp(semid, LIMIT_FIFO1, -1, IPC_NOWAIT) == 0) {
                                 // printf("<Client_%d> writing on FIFO1...\n", pid);
                                 write_fifo(fifo1FD, &mFifo1);
                                 sentFifo1 = true;
@@ -215,8 +221,7 @@ int main(int argc, char * argv[]) {
                         }
                         // check whether the message has been sent
                         if (!sentFifo2) {
-                            res = semOp(semid, LIMIT_FIFO2, -1, IPC_NOWAIT);
-                            if (res == 0) {
+                            if (semOp(semid, LIMIT_FIFO2, -1, IPC_NOWAIT) == 0) {
                                 // printf("<Client_%d> writing on FIFO2...\n", pid);
                                 write_fifo(fifo2FD, &mFifo2);
                                 sentFifo2 = true;
@@ -232,8 +237,7 @@ int main(int argc, char * argv[]) {
                         }
                         // check whether the message has been sent
                         if (!sentMsgq) {
-                            res = semOp(semid, LIMIT_MSGQ, -1, IPC_NOWAIT);
-                            if (res == 0) {
+                            if (semOp(semid, LIMIT_MSGQ, -1, IPC_NOWAIT) == 0) {
                                 // printf("<Client_%d> sending message through msgqueue...\n", pid);
                                 if (write_msgq(msqid, &mMsgq) == 0) {
                                     sentMsgq = true;
@@ -256,7 +260,6 @@ int main(int argc, char * argv[]) {
                             // printf("<Client_%d> writing on shared memory...\n", pid);
                             if (write_shdm(&mShm, shmPtr, shmArr) == 0) {
                                 sentShm = true;
-                                semOp(semid, SYNC_SHM, 1, 0);
                             }
                             // realease mutex
                             // printf("<Client_%d> releasing mutex...\n", pid);
@@ -274,14 +277,16 @@ int main(int argc, char * argv[]) {
             // code executed only by the parent
             // wait the termination of all child processes
             while(wait(NULL) != -1);
+            printf("<Client_0> all messages have been sent\n");
             // close fifo
             close(fifo1FD);
             close(fifo2FD);
+            // free pointer numFiles
             free(numFiles);
 
+            // wait for END message from server
             printf("<Client_0> waiting for end message from the server...\n");
             msgqueue_struct end;
-            // wait for the END message from server
             read_msgq(msqid, &end, 1337, 0);
             printf("<Client_0> recieved end message from the server\n\n");
             semOp(semid, END, 1, 0);

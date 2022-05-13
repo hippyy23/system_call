@@ -62,7 +62,6 @@ void read_fifo(int fd, message_struct *dest) {
  * @param m message_struct*
  */
 void write_fifo(int fifoFD, message_struct *src) {
-    // write message on fifo
     if (write(fifoFD, src, sizeof(message_struct)) == -1) {
         ErrExit("write failed");
     }

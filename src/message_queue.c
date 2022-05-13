@@ -35,12 +35,20 @@ int create_msgq(int key, int flags) {
  * @param dest msgqueue_struct*
  * @param mtype int
  * @param flg int
+ * @return int
  */
-void read_msgq(int msqid, msgqueue_struct *dest, int mtype, int flg) {
+int read_msgq(int msqid, msgqueue_struct *dest, int mtype, int flg) {
     size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
+    errno = 0;
     if (msgrcv(msqid, dest, mSize, mtype, flg) == -1) {
-        ErrExit("msgrcv failed");
+        if (errno == ENOMSG) {
+            return -1;
+        } else {
+            ErrExit("msgrcv failed");
+        }
     }
+
+    return 0;
 }
 
 /**
@@ -51,12 +59,10 @@ void read_msgq(int msqid, msgqueue_struct *dest, int mtype, int flg) {
  * @return int 
  */
 int write_msgq(int msqid, msgqueue_struct *src) {
-    // send the message to the server
     size_t mSize = sizeof(msgqueue_struct) - sizeof(long);
     errno = 0;
     if (msgsnd(msqid, src, mSize, IPC_NOWAIT) == -1) {
         if (errno == EAGAIN) {
-            // printf("Messaggio non mandato %s\n", m->mtext.path);
             return -1;
         } else {
             ErrExit("msgsnd failed");

@@ -7,8 +7,6 @@
 #include <fcntl.h>
 #include <string.h>
 
-//#include <sys/types.h>
-//#include <sys/stat.h>
 #include <sys/msg.h>
 
 #include "err_exit.h"
@@ -53,8 +51,8 @@ int main(int argc, char * argv[]) {
     // create a MESSAGE QUEUE
     msqid = create_msgq(keyMsq, IPC_CREAT | S_IRUSR | S_IWUSR);
 
-    // printf("<Server> creating shared memory segment...\n");
     // allocate a SHARED MEMORY SEGMENT
+    // printf("<Server> creating shared memory segment...\n");
     shmid = alloc_shared_memory(keyShm, 
             sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
@@ -65,7 +63,7 @@ int main(int argc, char * argv[]) {
     // move the pointer to where the array of "short" starts
     shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
 
-    // create a semaphore set with 8 semaphore
+    // create a semaphore set with 6 semaphore
     // printf("<Server> creating semaphore set...\n");
     semid = create_sem(keySem);
 
@@ -90,62 +88,89 @@ int main(int argc, char * argv[]) {
             printf("<Server> number of files to be recieved %d\n", numFiles);
         }
 
-        // initialize the semaphore
+        // initialize semaphore
         initialize_sem(semid, numFiles);
+
         // write init signal '*' to client through shared memory
         printf("<Server> writing start signal to client\n");
         shmPtr[0].pid = -23;
 
+        // allocate space for messages
         initialize_space_for_msg(numFiles);
-        
+        // open FIFO2
         fifo2FD = open_fifo(g_fifo2, O_RDONLY);
 
-        for (int i = 0; i < numFiles; i++) {
-            message_struct m1;
-            read_fifo(fifo1FD, &m1);
-            semOp(semid, LIMIT_FIFO1, 1, 0);
-            container_fifo1[i] = m1;
+        // vars that indicate number of messages recieved (for each IPC) and also the index (for each container)
+        int fifo1Rcv = 0;
+        int fifo2Rcv = 0;
+        int msqRcv = 0;
+        int shmRcv = 0;
 
-            // printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+        // iterate until all messages have been received
+        printf("<Server> recieving messages from client...\n");
+        while (fifo1Rcv < numFiles || fifo2Rcv < numFiles || msqRcv < numFiles || shmRcv < numFiles) {
+            // check whether all messages have already been received
+            if (fifo1Rcv < numFiles) {
+                message_struct m1;
+                read_fifo(fifo1FD, &m1);
+                semOp(semid, LIMIT_FIFO1, 1, 0);
+                container_fifo1[fifo1Rcv++] = m1;
+                // printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+            }
 
-            message_struct m2;
-            read_fifo(fifo2FD, &m2);
-            semOp(semid, LIMIT_FIFO2, 1, 0);
-            container_fifo2[i] = m2;
+            // check whether all messages have already been received
+            if (fifo2Rcv < numFiles) {
+                message_struct m2;
+                read_fifo(fifo2FD, &m2);
+                semOp(semid, LIMIT_FIFO2, 1, 0);
+                container_fifo2[fifo2Rcv++] = m2;
+                // printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
+            }
 
-            // printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
+            // check whether all messages have already been received
+            if (msqRcv < numFiles) {
+                msgqueue_struct m3;
+                if (read_msgq(msqid, &m3, 1, IPC_NOWAIT) == 0) {
+                    semOp(semid, LIMIT_MSGQ, 1, 0);
+                    container_msgq[msqRcv++] = m3;
+                    // printf("[Parte 3, del file %s, spedita dal processo %d tramite MsgQueue]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
+                }
+            }
 
-            msgqueue_struct m3;
-            read_msgq(msqid, &m3, 1, 0);
-            semOp(semid, LIMIT_MSGQ, 1, 0);
-            container_msgq[i] = m3;
-
-            // printf("[Parte 3, del file %s, spedita dal processo %d tramite MsgQueue]\n%s\n", m3.mtext.path, m3.mtext.pid, m3.mtext.content);
-
-            semOp(semid, SYNC_SHM, -1, 0);
-            message_struct m4;
-            // printf("\n<Server> getting mutex on shared memory...\n");
-            semOp(semid, MUTEX_SHM, -1, 0);
-            // printf("<Server> reading shared memory...\n");
-            read_shdm(shmPtr, &m4, shmArr);
-            // printf("<Server> releasing mutex...\n\n");
-            semOp(semid, MUTEX_SHM, 1, 0);
-            container_shdm[i] = m4;
-
-            // printf("[Parte 4, del file %s, spedita dal processo %d tramite ShdMem]\n%s\n", m4.path, m4.pid, m4.content);
+            // check whether all messages have already been received
+            if (shmRcv < numFiles) {
+                message_struct m4;
+                // printf("<Server> getting mutex on shared memory...\n");
+                semOp(semid, MUTEX_SHM, -1, 0);
+                // printf("<Server> reading shared memory...\n");
+                if (read_shdm(shmPtr, &m4, shmArr) == 0) {
+                    container_shdm[shmRcv++] = m4;
+                    // printf("[Parte 4, del file %s, spedita dal processo %d tramite ShdMem]\n%s\n", m4.path, m4.pid, m4.content);
+                }
+                // printf("<Server> releasing mutex...\n");
+                semOp(semid, MUTEX_SHM, 1, 0);
+            }
         }
+        printf("<Server> all messages were received\n");
+        // close FIFO
         close(fifo1FD);
         close(fifo2FD);
+
+        // write messages to output files
+        printf("<Server> writing messages to files...\n");
         write_messages_to_files(numFiles);
+
+        // free containers
         free(container_fifo1);
         free(container_fifo2);
         free(container_msgq);
         free(container_shdm);
 
+        // send END message to client
         printf("<Server> sending end message to client\n\n");
         msgqueue_struct end;
         end.mtype = 1337;
-        write_msgq(msqid, &end);
+        while (write_msgq(msqid, &end) != 0);
         semOp(semid, END, -1, 0);
     }
 

@@ -13,14 +13,13 @@
 
 
 /**
- * @brief Create a sem set with 7 semaphores
+ * @brief Create a sem set with 6 semaphores
  * 
  * @param semKey int
  * @return int: semid 
  */
 int create_sem(int key) {
-    // create a semaphore set with 7 semaphore
-    int semid = semget(key, 7, IPC_CREAT | S_IRUSR | S_IWUSR);
+    int semid = semget(key, 6, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (semid == -1) {
         ErrExit("semget failed");
     }
@@ -35,9 +34,8 @@ int create_sem(int key) {
  * @param num_child int
  */
 void initialize_sem(int semid, int num_child) {
-    // initialize the semaphore set
     union semun arg;
-    unsigned short values[] = {num_child, 1, 50, 50, 50, 0, 0};
+    unsigned short values[] = {num_child, 1, 50, 50, 50, 0};
     arg.array = values;
 
     if (semctl(semid, 0, SETALL, arg) == -1) {

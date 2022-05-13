@@ -71,24 +71,9 @@ void start_client0(int sig) {
 };
 
 /**
- * @brief Get the username
- * 
- * @return char* 
- */
-char * get_username() {
-    struct passwd *pwd = getpwuid(getuid());
-    if (pwd) {
-        return pwd->pw_name;
-    } else {
-        return "";
-    }
-}
-
-/**
  * @brief Search for files that start with "sendme_" in the cwd and all sub-directories
  */
 void search(int *pos) {
-    //static int pos = 0;
     DIR *dirp = opendir(g_wd);
     if (dirp == NULL) {
         ErrExit("open dir failed");
@@ -100,10 +85,8 @@ void search(int *pos) {
         if (strcmp(dentry->d_name, ".") == 0 || strcmp(dentry->d_name, "..") == 0) {
             continue;
         }
-
         if (dentry->d_type == DT_REG) {
             size_t lastPath = append_path(dentry->d_name);
-            
             if (check_file_name(dentry->d_name, "sendme_") && check_file_size(g_wd, MAX_FILE_SIZE)) {
                 strncpy(g_files[*pos], g_wd, PATH_SIZE);
                 (*pos)++;
@@ -113,7 +96,6 @@ void search(int *pos) {
                 }
             }            
             g_wd[lastPath] = '\0';
-
         } else if (dentry->d_type == DT_DIR) {
             size_t lastPath = append_path(dentry->d_name);
             search(pos);
@@ -168,20 +150,6 @@ int check_file_size(char *pathname, off_t size) {
     int fileSize = statbuf.st_size;
 
     return fileSize <= size && fileSize >= 4;
-}
-
-/**
- * @brief Get the number of files found
- * 
- * @return int 
- */
-int get_num_files() {
-    int n = 0;
-    for (int i = 0; strcmp(g_files[i], "") != 0; i++) {
-        n++;
-    }
-
-    return n;
 }
 
 /**

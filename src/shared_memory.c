@@ -63,14 +63,16 @@ void free_shared_memory(void *ptr) {
  * @param dest message_struct*
  * @param shmArr short*
  */
-void read_shdm(message_struct *src, message_struct *dest, short *shmArr) {
+int read_shdm(message_struct *src, message_struct *dest, short *shmArr) {
     for (int index = 0; index < MAX_MESSAGES_PER_IPC; index++) {
         if (shmArr[index] == 1) {
             *dest = src[index];
             shmArr[index] = 0;
-            return;
+            return 0;
         }
     }
+
+    return -1;
 }
 
 /**

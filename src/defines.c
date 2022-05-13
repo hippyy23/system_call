@@ -10,5 +10,7 @@
 #include "err_exit.h"
 
 
+// path of FIFO1 and FIFO2
+
 char *g_fifo1 = "/tmp/fifo1";
 char *g_fifo2 = "/tmp/fifo2";
