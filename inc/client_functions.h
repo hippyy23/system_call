@@ -23,7 +23,6 @@ void start_client0();
 void terminate_client0();
 void block_all_signals();
 void unlock_signals();
-char * get_username();
 size_t append_path(char *);
 int check_file_name(char *, char *);
 int check_file_size(char *, off_t);

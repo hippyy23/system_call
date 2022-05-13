@@ -10,6 +10,6 @@
 int alloc_shared_memory(key_t, size_t);
 void * attach_shared_memory(int, int);
 void free_shared_memory(void *);
-void read_shdm(message_struct *, message_struct *, short *);
+int read_shdm(message_struct *, message_struct *, short *);
 int write_shdm(message_struct *, message_struct *, short *);
 void remove_shared_memory(int);

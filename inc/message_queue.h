@@ -8,6 +8,6 @@
 
 
 int create_msgq(int, int);
-void read_msgq(int, msgqueue_struct *, int, int);
+int read_msgq(int, msgqueue_struct *, int, int);
 int write_msgq(int, msgqueue_struct *);
 void remove_msgq(int);
