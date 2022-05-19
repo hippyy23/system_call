@@ -24,7 +24,7 @@
 // STRUCT DEFINITION
 
 typedef struct message {
-    char content[MAX_PAGE_SIZE];
+    char content[MAX_PAGE_SIZE + 1];
     int pid;
     char path[PATH_SIZE];
 } message_struct;

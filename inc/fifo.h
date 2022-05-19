@@ -9,6 +9,6 @@
 
 void make_fifo(char *);
 int open_fifo(char *, int);
-void read_fifo(int, message_struct *);
+int read_fifo(int, message_struct *);
 void write_fifo(int, message_struct *);
 void close_fifo(int, char *);
