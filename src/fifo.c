@@ -48,11 +48,19 @@ int open_fifo(char *path, int flg) {
  * 
  * @param fd int
  * @param m message_struct*
+ * @return int
  */
-void read_fifo(int fd, message_struct *dest) {
+int read_fifo(int fd, message_struct *dest) {
+    errno = 0;
     if (read(fd, dest, sizeof(message_struct)) == -1) {
-        ErrExit("read failed");
+        if (errno == EAGAIN) {
+            return -1;
+        } else {
+            ErrExit("read failed");
+        }
     }
+
+    return 0;
 }
 
 /**
@@ -62,7 +70,9 @@ void read_fifo(int fd, message_struct *dest) {
  * @param m message_struct*
  */
 void write_fifo(int fifoFD, message_struct *src) {
+    errno = 0;
     if (write(fifoFD, src, sizeof(message_struct)) == -1) {
+        printf("%d\n", errno);
         ErrExit("write failed");
     }
 }

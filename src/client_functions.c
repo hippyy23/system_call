@@ -208,7 +208,6 @@ message_struct create_message_struct(int fileFD, int pid, int index, int size) {
     strncpy(m.path, g_files[index], PATH_SIZE);
     // read from file a chunk of size 'size' and write it into the message
     read_from_file(fileFD, m.content, size);
-
     return m;
 }
 

@@ -72,7 +72,7 @@ int main(int argc, char * argv[]) {
         printf("<Client_0> number of files found %d\n", *numFiles);
 
         // send the number of files to the server through fifo1
-        printf("<Client_0> opening fifo1 %s\n", g_fifo1);
+        printf("<Client_0> opening FIFO1: %s\n", g_fifo1);
         fifo1FD = open_fifo(g_fifo1, O_WRONLY);
         if (write(fifo1FD, numFiles, sizeof(int)) != sizeof(int)) {
             ErrExit("write failed");
@@ -88,10 +88,11 @@ int main(int argc, char * argv[]) {
         }
 
         // get the server msqid
+        printf("<Client_0> getting server's MESSAGE QUEUE...\n");
         msqid = create_msgq(keyMsq, 0);
 
         // get the server's shared memory segment
-        printf("<Client_0> getting server's shared memory segment...\n");
+        printf("<Client_0> getting server's SHARED MEMORY SEGMENT...\n");
         shmid = alloc_shared_memory(keyShm, 
                     sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
         // attach the SHARED MEMORY SEGMENT in read/write mode
@@ -103,11 +104,11 @@ int main(int argc, char * argv[]) {
         shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
 
         // get the semaphore set
-        printf("<Client_0> getting server's semaphore set...\n");
+        printf("<Client_0> getting server's SEMAPHORE SET...\n");
         semid = semget(keySem, 6, 0);
 
         // open FIFO2
-        printf("<Client_0> opening fifo2 %s\n", g_fifo2);
+        printf("<Client_0> opening FIFO2: %s\n", g_fifo2);
         fifo2FD = open_fifo(g_fifo2, O_WRONLY);
 
         if (semid != -1) {
@@ -200,7 +201,7 @@ int main(int argc, char * argv[]) {
                         // write on FIFO1 the 1st part of the file
                         // check if the structure is initialized
                         if (mFifo1.pid == 0) {
-                            // printf("<Client_%d> creating message struct fifo1...\n", pid);
+                            // printf("<Client_%d> creating message struct FIFO1...\n", pid);
                             mFifo1 = create_message_struct(fileFD, pid, child, sizeFifo1);
                         }
                         // check whether the message has been sent
@@ -258,7 +259,7 @@ int main(int argc, char * argv[]) {
                             // printf("<Client_%d> getting mutex on shared memory...\n", pid);
                             semOp(semid, MUTEX_SHM, -1, 0);
                             // printf("<Client_%d> writing on shared memory...\n", pid);
-                            if (write_shdm(&mShm, shmPtr, shmArr) == 0) {
+                            if (write_shdm(&mShm, shmPtr, shmArr) == 0) {                                
                                 sentShm = true;
                             }
                             // realease mutex

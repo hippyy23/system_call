@@ -1,5 +1,5 @@
-/// @file sender_manager.c
-/// @brief Contiene l'implementazione del sender_manager.
+/// @file server.c
+/// @brief Contiene l'implementazione del server.
 
 #include <stdlib.h>
 #include <signal.h>
@@ -34,9 +34,9 @@ void terminate_server() {
 
 int main(int argc, char * argv[]) {
     // make FIFO1 and FIFO2
-    // printf("<Server> creating FIFO1 %s...\n", g_fifo1);
+    printf("<Server> creating FIFO1: %s...\n", g_fifo1);
     make_fifo(g_fifo1);
-    // printf("<Server> creating FIFO2 %s...\n", g_fifo2);
+    printf("<Server> creating FIFO2: %s...\n", g_fifo2);
     make_fifo(g_fifo2);
 
     // create keys for IPCs
@@ -49,10 +49,11 @@ int main(int argc, char * argv[]) {
     }
 
     // create a MESSAGE QUEUE
+    printf("<Server> creating MESSAGE QUEUE...\n");
     msqid = create_msgq(keyMsq, IPC_CREAT | S_IRUSR | S_IWUSR);
 
     // allocate a SHARED MEMORY SEGMENT
-    // printf("<Server> creating shared memory segment...\n");
+    printf("<Server> creating SHARED MEMORY SEGMENT...\n");
     shmid = alloc_shared_memory(keyShm, 
             sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
     // attach the SHARED MEMORY SEGMENT in read/write mode
@@ -64,7 +65,7 @@ int main(int argc, char * argv[]) {
     shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
 
     // create a semaphore set with 6 semaphore
-    // printf("<Server> creating semaphore set...\n");
+    printf("<Server> creating SEMAPHORE SET...\n");
     semid = create_sem(keySem);
 
     // change signal handler for SIGINT
@@ -87,6 +88,7 @@ int main(int argc, char * argv[]) {
         } else {
             printf("<Server> number of files to be recieved %d\n", numFiles);
         }
+        close(fifo1FD);
 
         // initialize semaphore
         initialize_sem(semid, numFiles);
@@ -97,8 +99,9 @@ int main(int argc, char * argv[]) {
 
         // allocate space for messages
         initialize_space_for_msg(numFiles);
-        // open FIFO2
-        fifo2FD = open_fifo(g_fifo2, O_RDONLY);
+        // open FIFO1 and FIFO2 in non blocking mode
+        fifo1FD = open_fifo(g_fifo1, O_RDONLY | O_NONBLOCK);
+        fifo2FD = open_fifo(g_fifo2, O_RDONLY | O_NONBLOCK);
 
         // vars that indicate number of messages recieved (for each IPC) and also the index (for each container)
         int fifo1Rcv = 0;
@@ -112,19 +115,21 @@ int main(int argc, char * argv[]) {
             // check whether all messages have already been received
             if (fifo1Rcv < numFiles) {
                 message_struct m1;
-                read_fifo(fifo1FD, &m1);
-                semOp(semid, LIMIT_FIFO1, 1, 0);
-                container_fifo1[fifo1Rcv++] = m1;
-                // printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+                if (read_fifo(fifo1FD, &m1) == 0) {
+                    semOp(semid, LIMIT_FIFO1, 1, 0);
+                    container_fifo1[fifo1Rcv++] = m1;
+                    // printf("[Parte 1, del file %s, spedita dal processo %d tramite FIFO1]\n%s\n", m1.path, m1.pid, m1.content);
+                }                
             }
 
             // check whether all messages have already been received
             if (fifo2Rcv < numFiles) {
                 message_struct m2;
-                read_fifo(fifo2FD, &m2);
-                semOp(semid, LIMIT_FIFO2, 1, 0);
-                container_fifo2[fifo2Rcv++] = m2;
-                // printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
+                if (read_fifo(fifo2FD, &m2) == 0) {
+                    semOp(semid, LIMIT_FIFO2, 1, 0);
+                    container_fifo2[fifo2Rcv++] = m2;
+                    // printf("[Parte 2, del file %s, spedita dal processo %d tramite FIFO2]\n%s\n", m2.path, m2.pid, m2.content);
+                }
             }
 
             // check whether all messages have already been received
