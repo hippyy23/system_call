@@ -51,8 +51,6 @@ void * attach_shared_memory(int shmid, int shmflg) {
 void free_shared_memory(void *ptr) {
     if (shmdt(ptr) == -1) {
         ErrExit("shmdt failed");
-    }  else {
-        printf("<Server> Shared Memory detached successfully\n");
     }
 }
 
@@ -104,7 +102,5 @@ int write_shdm(message_struct *src, message_struct *dest, short *shmArr) {
 void remove_shared_memory(int shmid) {
     if (shmctl(shmid, IPC_RMID, NULL) == -1) {
         ErrExit("shmctl failed");
-    } else {
-        printf("<Server> Shared Memory removed successfully\n");
     }
 }

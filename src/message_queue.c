@@ -82,8 +82,5 @@ void remove_msgq(int msqid) {
         if (msgctl(msqid, IPC_RMID, NULL) == -1) {
             ErrExit("msgctl failed");
         }
-        else {
-            printf("<Server> Message Queue removed successfully\n");
-        }
     }
 }

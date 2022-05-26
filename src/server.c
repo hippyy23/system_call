@@ -20,14 +20,23 @@
 
 void terminate_server() {
     remove_msgq(msqid);
+    printf("<Server> Message Queue removed successfully\n");
 
     remove_sem(semid);
+    printf("<Server> Semaphore Set removed successfully\n");
 
     free_shared_memory(shmPtr);
+    // set shmArr pointer to its initial value before detaching
+    shmArr -= (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
+    free_shared_memory(shmArr);
+    printf("<Server> Shared Memory detached successfully\n");
     remove_shared_memory(shmid);
+    printf("<Server> Shared Memory removed successfully\n");
 
     close_fifo(fifo1FD, g_fifo1);
+    printf("<Server> FIFO1 removed successfully\n");
     close_fifo(fifo2FD, g_fifo2);
+    printf("<Server> FIFO2 removed successfully\n");
 
     exit(0);
 }
@@ -76,6 +85,7 @@ int main(int argc, char * argv[]) {
     while (1) {
         printf("<Server> waiting for the number of files...\n");
 
+        semOp(semid, START, -1, 0);
         // open FIFO1 in read-only
         fifo1FD = open_fifo(g_fifo1, O_RDONLY);
         int numFiles;
@@ -90,16 +100,13 @@ int main(int argc, char * argv[]) {
         }
         close(fifo1FD);
 
-        // initialize semaphore
-        initialize_sem(semid, numFiles);
-
-        // write init signal '*' to client through shared memory
+        // write init signal to client through shared memory
         printf("<Server> writing start signal to client\n");
         shmPtr[0].pid = -23;
 
         // allocate space for messages
         initialize_space_for_msg(numFiles);
-        // open FIFO1 and FIFO2 in non blocking mode
+        // open FIFO1 and FIFO2 in non-blocking mode
         fifo1FD = open_fifo(g_fifo1, O_RDONLY | O_NONBLOCK);
         fifo2FD = open_fifo(g_fifo2, O_RDONLY | O_NONBLOCK);
 
@@ -176,7 +183,6 @@ int main(int argc, char * argv[]) {
         msgqueue_struct end;
         end.mtype = 1337;
         while (write_msgq(msqid, &end) != 0);
-        semOp(semid, END, -1, 0);
     }
 
     return 0;

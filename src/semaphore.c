@@ -22,6 +22,8 @@ int create_sem(int key) {
     int semid = semget(key, 6, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (semid == -1) {
         ErrExit("semget failed");
+    } else {
+        initialize_sem(semid);
     }
 
     return semid;
@@ -31,11 +33,10 @@ int create_sem(int key) {
  * @brief Initialize sem set
  * 
  * @param semid int
- * @param num_child int
  */
-void initialize_sem(int semid, int num_child) {
+void initialize_sem(int semid) {
     union semun arg;
-    unsigned short values[] = {num_child, 1, 50, 50, 50, 0};
+    unsigned short values[] = {0, 1, 50, 50, 50, 0};
     arg.array = values;
 
     if (semctl(semid, 0, SETALL, arg) == -1) {
@@ -51,8 +52,6 @@ void initialize_sem(int semid, int num_child) {
 void remove_sem(int semid) {
     if (semctl(semid, 0, IPC_RMID, 0) == -1) {
         ErrExit("semctl IPC_RMID failed");
-    } else {
-        printf("<Server> Semaphore Set removed successfully\n");
     }
 }
 

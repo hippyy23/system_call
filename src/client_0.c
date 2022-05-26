@@ -30,6 +30,7 @@
 int main(int argc, char * argv[]) {
     int fifo1FD, fifo2FD;
     int semid, shmid, msqid;
+    message_struct *shmPtr;
     short *shmArr;
 
     // check command line input arguments
@@ -61,6 +62,22 @@ int main(int argc, char * argv[]) {
         pause();
         block_all_signals();
 
+        // create keys for IPCs
+        key_t keyMsq = ftok(g_fifo1, 'a');
+        key_t keyShm = ftok(g_fifo1, 'b');
+        key_t keySem = ftok(g_fifo1, 'c');
+        // check if keys have been created
+        if (keyMsq == -1 || keyShm == -1 || keySem == -1) {
+            ErrExit("ftok failed");
+        }
+
+        // get the semaphore set
+        printf("<Client_0> getting server's SEMAPHORE SET...\n");
+        semid = semget(keySem, 6, 0);
+
+        // unlock server
+        semOp(semid, START, 1, 0);
+
         // search for all files whose name starts with "send_"
         int *numFiles = malloc(sizeof(int));
         *numFiles = 0;
@@ -74,18 +91,14 @@ int main(int argc, char * argv[]) {
         // send the number of files to the server through fifo1
         printf("<Client_0> opening FIFO1: %s\n", g_fifo1);
         fifo1FD = open_fifo(g_fifo1, O_WRONLY);
+        printf("<Client_0> writing number of files found to server...\n");
         if (write(fifo1FD, numFiles, sizeof(int)) != sizeof(int)) {
             ErrExit("write failed");
         }
 
-        // create keys for IPCs
-        key_t keyMsq = ftok(g_fifo1, 'a');
-        key_t keyShm = ftok(g_fifo1, 'b');
-        key_t keySem = ftok(g_fifo1, 'c');
-        // check if keys have been created
-        if (keyMsq == -1 || keyShm == -1 || keySem == -1) {
-            ErrExit("ftok failed");
-        }
+        // open FIFO2
+        printf("<Client_0> opening FIFO2: %s\n", g_fifo2);
+        fifo2FD = open_fifo(g_fifo2, O_WRONLY);
 
         // get the server msqid
         printf("<Client_0> getting server's MESSAGE QUEUE...\n");
@@ -96,20 +109,12 @@ int main(int argc, char * argv[]) {
         shmid = alloc_shared_memory(keyShm, 
                     sizeof(message_struct) * MAX_MESSAGES_PER_IPC + sizeof(short) * MAX_MESSAGES_PER_IPC);
         // attach the SHARED MEMORY SEGMENT in read/write mode
-        message_struct *shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
+        shmPtr = (message_struct *) attach_shared_memory(shmid, 0);
         // attach an additional pointer to SHARED MEMORY SEGMENT
         // to handle the SHARED MEMORY SEGMENT allocation
         shmArr = (short *) attach_shared_memory(shmid, 0);
-        // move the pointer to where the array of "short" starts
-        shmArr = shmArr + (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
-
-        // get the semaphore set
-        printf("<Client_0> getting server's SEMAPHORE SET...\n");
-        semid = semget(keySem, 6, 0);
-
-        // open FIFO2
-        printf("<Client_0> opening FIFO2: %s\n", g_fifo2);
-        fifo2FD = open_fifo(g_fifo2, O_WRONLY);
+        // move the pointer to where the array starts
+        shmArr += (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
 
         if (semid != -1) {
             // wait for response from server on shared memory segment
@@ -134,6 +139,7 @@ int main(int argc, char * argv[]) {
                     ErrExit("fork failed");
                 // check whether the running process is the parent or the child
                 } else if (pid == 0) {
+                    semOp(semid, WAIT_CHILD, 1, 0);
                     // code executed only by the child
                     pid_t pid = getpid();
 
@@ -279,18 +285,22 @@ int main(int argc, char * argv[]) {
             // wait the termination of all child processes
             while(wait(NULL) != -1);
             printf("<Client_0> all messages have been sent\n");
-            // close fifo
+            // close FIFO
             close(fifo1FD);
             close(fifo2FD);
-            // free pointer numFiles
+            // free pointer (numFiles)
             free(numFiles);
+            // detach SHARED MEMORY SEGMENT
+            free_shared_memory(shmPtr);
+            // set shmArr pointer to its initial value before detaching
+            shmArr -= (sizeof(message_struct) * MAX_MESSAGES_PER_IPC / 2);
+            free_shared_memory(shmArr);
 
             // wait for END message from server
             printf("<Client_0> waiting for end message from the server...\n");
             msgqueue_struct end;
             read_msgq(msqid, &end, 1337, 0);
             printf("<Client_0> recieved end message from the server\n\n");
-            semOp(semid, END, 1, 0);
 
             unlock_signals();
 
