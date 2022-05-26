@@ -18,7 +18,7 @@
 #define LIMIT_FIFO1 2
 #define LIMIT_FIFO2 3
 #define LIMIT_MSGQ 4
-#define END 5
+#define START 5
 
 
 // STRUCT DEFINITION

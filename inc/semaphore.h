@@ -12,6 +12,6 @@ union semun {
 };
 
 int create_sem(int);
-void initialize_sem(int, int);
+void initialize_sem(int);
 int semOp(int, unsigned short, short, short);
 void remove_sem(int);

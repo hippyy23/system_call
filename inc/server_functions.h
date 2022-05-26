@@ -12,7 +12,6 @@ message_struct *container_fifo2;
 msgqueue_struct *container_msgq;
 message_struct *container_shdm;
 message_struct *shmPtr;
-
 short *shmArr;
 int shmid;
 int msqid;
