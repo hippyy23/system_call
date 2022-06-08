@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <limits.h>
+#include <sys/types.h>
 
 #define MAX_FILES 100
 #define MAX_FILE_SIZE 4096
@@ -25,7 +26,7 @@
 
 typedef struct message {
     char content[MAX_PAGE_SIZE + 1];
-    int pid;
+    pid_t pid;
     char path[PATH_SIZE];
 } message_struct;
 

@@ -7,7 +7,7 @@
 #pragma once
 
 
-int create_msgq(int, int);
+int create_msgq(key_t, int);
 int read_msgq(int, msgqueue_struct *, int, int);
 int write_msgq(int, msgqueue_struct *);
 void remove_msgq(int);

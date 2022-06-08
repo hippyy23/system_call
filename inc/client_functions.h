@@ -12,7 +12,7 @@
 #define MAX_FILES 100
 
 
-// 2d array to contain the path of 'MAX_FILES' files
+// 2D array to contain the path of 'MAX_FILES' files
 char g_files[MAX_FILES][PATH_SIZE];
 // pointer to the cwd
 char *g_wd;
@@ -29,5 +29,5 @@ int check_file_size(char *, off_t);
 int check_num_chars_in_file(int);
 void search(int *);
 void read_from_file(int, char *, int);
-message_struct create_message_struct(int, int, int, int);
-msgqueue_struct create_msgqueue_struct(int, int, int, int);
+message_struct create_message_struct(int, pid_t, int, int);
+msgqueue_struct create_msgqueue_struct(int, pid_t, int, int);
