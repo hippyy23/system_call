@@ -38,7 +38,7 @@ void terminate_server() {
     close_fifo(fifo2FD, g_fifo2);
     printf("<Server> FIFO2 removed successfully\n");
 
-    exit(0);
+    _exit(0);
 }
 
 int main(int argc, char * argv[]) {
@@ -82,10 +82,16 @@ int main(int argc, char * argv[]) {
         ErrExit("change signal handler failed");
     }
 
+    // handle exit
+    if (atexit(terminate_server) != 0) {
+        _exit(EXIT_FAILURE);
+    }
+
     while (1) {
         printf("<Server> waiting for the number of files...\n");
-
+        // wait for unlock from client (sync purpose)
         semOp(semid, START, -1, 0);
+
         // open FIFO1 in read-only
         fifo1FD = open_fifo(g_fifo1, O_RDONLY);
         int numFiles;

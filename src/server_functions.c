@@ -40,7 +40,8 @@ void initialize_space_for_msg(int numFiles) {
  * @param numFiles int
  */
 void write_messages_to_files(int numFiles) {
-    int fd, f2Index, msgqIndex, shdmIndex, pid;
+    int fd, f2Index, msgqIndex, shdmIndex;
+    pid_t pid;
     char newPath[PATH_SIZE];
     char mode[][9] = {"FIFO1", "FIFO2", "MsgQueue", "ShdMem"};
 
@@ -116,11 +117,11 @@ void set_file_out_name(char *oldPath, char *newPath) {
  * @brief Get the message index that matches the PID from a container
  * 
  * @param container msgqueue_struct*
- * @param pid int
+ * @param pid pid_t
  * @param size int
  * @return int 
  */
-int get_index(message_struct *container, int pid, int size) {
+int get_index(message_struct *container, pid_t pid, int size) {
     for (int index = 0; index < size; index++) {
         if (container[index].pid == pid) {
             return index;
@@ -134,11 +135,11 @@ int get_index(message_struct *container, int pid, int size) {
  * @brief Get the message index that matches the PID from msq container
  * 
  * @param container msgqueue_struct*
- * @param pid int
+ * @param pid pid_t
  * @param size int
  * @return int 
  */
-int get_index_msgq(msgqueue_struct *container, int pid, int size) {
+int get_index_msgq(msgqueue_struct *container, pid_t pid, int size) {
     for (int index = 0; index < size; index++) {
         if (container[index].mtext.pid == pid) {
             return index;

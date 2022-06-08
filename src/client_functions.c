@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <unistd.h>
 #include <signal.h>
 #include <pwd.h>
@@ -194,12 +193,12 @@ void read_from_file(int fd, char *buffer, int size) {
  * @brief Create a message struct object
  * 
  * @param fileFD int
- * @param pid int
+ * @param pid pid_t
  * @param index int
  * @param size int
  * @return message_struct 
  */
-message_struct create_message_struct(int fileFD, int pid, int index, int size) {
+message_struct create_message_struct(int fileFD, pid_t pid, int index, int size) {
     // initialize the struct of the message
     message_struct m;
     // write the pid into the message
@@ -215,12 +214,12 @@ message_struct create_message_struct(int fileFD, int pid, int index, int size) {
  * @brief Create a msgqueue struct object
  * 
  * @param fileFD int
- * @param pid int
+ * @param pid pid_t
  * @param index int
  * @param size int
  * @return msgqueue_struct
  */
-msgqueue_struct create_msgqueue_struct(int fileFD, int pid, int index, int size) {
+msgqueue_struct create_msgqueue_struct(int fileFD, pid_t pid, int index, int size) {
     // initialize the struct of the message
     msgqueue_struct m;
     m.mtype = 1;

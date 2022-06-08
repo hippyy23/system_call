@@ -15,10 +15,10 @@
 /**
  * @brief Create a sem set with 6 semaphores
  * 
- * @param semKey int
+ * @param semKey key_t
  * @return int: semid 
  */
-int create_sem(int key) {
+int create_sem(key_t key) {
     int semid = semget(key, 6, IPC_CREAT | S_IRUSR | S_IWUSR);
     if (semid == -1) {
         ErrExit("semget failed");

@@ -15,11 +15,11 @@
 /**
  * @brief Create/Get MESSAGE QUEUE
  * 
- * @param key int
+ * @param key key_t
  * @param flags int
  * @return int: msqid
  */
-int create_msgq(int key, int flags) {
+int create_msgq(key_t key, int flags) {
     int msqid = msgget(key, flags);
     if (msqid == -1) {
         ErrExit("msgget failed");
